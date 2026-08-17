@@ -1,0 +1,31 @@
+{
+  "algorithm": "time-window-aware split-delivery greedy + intra-route 2-opt",
+  "active_customers": 88,
+  "zero_demand_customers": 10,
+  "routes": 121,
+  "vehicle_usage": {
+    "EV-3000": 10,
+    "FUEL-3000": 60,
+    "FUEL-1500": 50,
+    "EV-1250": 1
+  },
+  "imputed_weight_rows": 14,
+  "imputed_volume_rows": 16,
+  "total_distance_km": 15191.920954562105,
+  "fuel_liters": 4343.360002311306,
+  "electricity_kwh": 379.5854103735222,
+  "total_emissions_kg": 11252.710216484033,
+  "fixed_cost": 48400.0,
+  "energy_cost": 33675.489690601615,
+  "carbon_cost": 7314.261640714621,
+  "waiting_cost": 84.1464344226772,
+  "late_cost": 21.321891374712813,
+  "total_cost": 89495.21965711363,
+  "assumptions": [
+    "缺失重量/体积先用同客户中位数填补，再用全局中位数兜底",
+    "客户总需求允许按重量与体积同比例拆分给多辆车",
+    "车速使用题面正态分布的均值，并按跨时段分段行驶",
+    "17:00 后题面未给速度，基线按顺畅时段均值 55.3 km/h",
+    "载荷能耗增幅按重量/容积利用率最大值线性插值"
+  ]
+}

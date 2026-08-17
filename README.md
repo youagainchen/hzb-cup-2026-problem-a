@@ -37,10 +37,25 @@ tools/               非求解代码的辅助工具
 4. 1 号实现 `evaluator.py`，先通过手算与可行性检查，再开始优化。
 5. 路线、图表与三问结果都调用同一评估器。
 
+## 问题一基线代码
+
+当前版本实现“软时间窗感知的拆分配送贪心 + 路线内 2-opt”：
+
+```powershell
+python -m src.main
+```
+
+程序会读取 `data/raw/`，并输出：
+
+- `results/routes/question1_baseline_routes.csv`：逐车、逐站配送路线与到达时间；
+- `results/tables/question1_baseline_route_summary.csv`：车辆使用和分项成本；
+- `results/tables/question1_baseline_totals.json`：总成本、总里程、碳排放及建模假设。
+
+这是一套可复现的初始可行解，不是最终最优解。下一步应在同一评估器上加入跨路线客户搬移、交换、车辆类型重分配，再升级为 ALNS。
+
 ## 协作约定
 
 - `main` 始终保持可运行；功能分支使用 `role1/`、`role2/`、`role3/` 前缀。
 - 原始 Excel 不修改；清洗结果写入 `data/processed/`。
 - 提交信息使用简短中文，例如：`数据：完成订单缺失值审计`。
 - 合并前至少检查漏单、重复、超载、时间窗、限行和成本汇总。
-
