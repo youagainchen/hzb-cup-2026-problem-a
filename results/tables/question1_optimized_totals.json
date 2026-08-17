@@ -1,0 +1,167 @@
+{
+  "solution_variant": "optimized",
+  "algorithm": "best of cost-aware Clarke-Wright and time-window greedy + route elimination + 2-opt + relocate + swap + route merge + global vehicle assignment + departure-time optimization + multi-trip physical-vehicle scheduling",
+  "data_source": "D:\\Tencent Files\\A题\\data\\processed\\team_cleaned",
+  "active_customers": 88,
+  "no_order_customers": 10,
+  "delivery_trips": 99,
+  "physical_vehicles": 33,
+  "trip_count_capacity_lower_bound": 96,
+  "trip_usage_by_type": {
+    "EV-3000": 49,
+    "FUEL-3000": 50
+  },
+  "physical_vehicle_usage": {
+    "EV-3000": 10,
+    "FUEL-3000": 23
+  },
+  "imputed_weight_rows": 14,
+  "imputed_volume_rows": 16,
+  "total_distance_km": 11459.62230882674,
+  "fuel_liters": 1578.7967739149094,
+  "electricity_kwh": 2501.48225784788,
+  "total_emissions_kg": 5274.437994343063,
+  "fixed_cost": 13200.0,
+  "energy_cost": 16117.074352362984,
+  "carbon_cost": 3428.3846963229907,
+  "waiting_cost": 505.10596949195946,
+  "late_cost": 11600.052828140799,
+  "total_cost": 44850.61784631873,
+  "cost_share": {
+    "fixed": 0.29431032689962006,
+    "energy": 0.359350107674957,
+    "carbon": 0.07644007732670259,
+    "waiting": 0.011261962348494555,
+    "late": 0.2586375257502258
+  },
+  "optimization_trace": [
+    {
+      "stage": "initial_savings",
+      "vehicles": 34,
+      "trips": 100,
+      "distance_km": 11077.801423286492,
+      "fixed_cost": 13600.0,
+      "energy_cost": 16017.983757809063,
+      "carbon_cost": 3412.6597506533417,
+      "waiting_cost": 512.3953630742525,
+      "late_cost": 14324.926065205695,
+      "total_cost": 47867.964936742355
+    },
+    {
+      "stage": "eliminate_low_load",
+      "vehicles": 36,
+      "trips": 99,
+      "distance_km": 11519.817441870058,
+      "fixed_cost": 14400.0,
+      "energy_cost": 17218.98960488686,
+      "carbon_cost": 3674.8582640084483,
+      "waiting_cost": 671.539212517227,
+      "late_cost": 11463.083520570975,
+      "total_cost": 47428.470601983514
+    },
+    {
+      "stage": "two_opt_1",
+      "vehicles": 35,
+      "trips": 99,
+      "distance_km": 11434.55923195304,
+      "fixed_cost": 14000.0,
+      "energy_cost": 16731.776866904667,
+      "carbon_cost": 3566.7833770390803,
+      "waiting_cost": 662.3259958295716,
+      "late_cost": 11616.308385104558,
+      "total_cost": 46577.19462487788
+    },
+    {
+      "stage": "relocate",
+      "vehicles": 34,
+      "trips": 99,
+      "distance_km": 11435.17293070805,
+      "fixed_cost": 13600.0,
+      "energy_cost": 16426.05321239468,
+      "carbon_cost": 3497.94242605327,
+      "waiting_cost": 523.2025445495991,
+      "late_cost": 11288.076964402855,
+      "total_cost": 45335.2751474004
+    },
+    {
+      "stage": "swap",
+      "vehicles": 33,
+      "trips": 99,
+      "distance_km": 11459.62230882674,
+      "fixed_cost": 13200.0,
+      "energy_cost": 16117.074352362984,
+      "carbon_cost": 3428.3846963229907,
+      "waiting_cost": 505.10596949195946,
+      "late_cost": 11600.052828140799,
+      "total_cost": 44850.61784631873
+    },
+    {
+      "stage": "route_merge",
+      "vehicles": 33,
+      "trips": 99,
+      "distance_km": 11459.62230882674,
+      "fixed_cost": 13200.0,
+      "energy_cost": 16117.074352362984,
+      "carbon_cost": 3428.3846963229907,
+      "waiting_cost": 505.10596949195946,
+      "late_cost": 11600.052828140799,
+      "total_cost": 44850.61784631873
+    },
+    {
+      "stage": "select_vehicle",
+      "vehicles": 33,
+      "trips": 99,
+      "distance_km": 11459.62230882674,
+      "fixed_cost": 13200.0,
+      "energy_cost": 16117.074352362984,
+      "carbon_cost": 3428.3846963229907,
+      "waiting_cost": 505.10596949195946,
+      "late_cost": 11600.052828140799,
+      "total_cost": 44850.61784631873
+    },
+    {
+      "stage": "eliminate_low_load_2",
+      "vehicles": 33,
+      "trips": 98,
+      "distance_km": 11442.36872398127,
+      "fixed_cost": 13200.0,
+      "energy_cost": 16146.85371575622,
+      "carbon_cost": 3434.970044562572,
+      "waiting_cost": 513.316971004343,
+      "late_cost": 11895.610351290701,
+      "total_cost": 45190.75108261384
+    },
+    {
+      "stage": "two_opt_2",
+      "vehicles": 33,
+      "trips": 98,
+      "distance_km": 11442.36872398127,
+      "fixed_cost": 13200.0,
+      "energy_cost": 16146.85371575622,
+      "carbon_cost": 3434.970044562572,
+      "waiting_cost": 513.316971004343,
+      "late_cost": 11895.610351290701,
+      "total_cost": 45190.75108261384
+    },
+    {
+      "stage": "best_solution_restored",
+      "vehicles": 33,
+      "trips": 99,
+      "distance_km": 11459.62230882674,
+      "fixed_cost": 13200.0,
+      "energy_cost": 16117.074352362984,
+      "carbon_cost": 3428.3846963229907,
+      "waiting_cost": 505.10596949195946,
+      "late_cost": 11600.052828140799,
+      "total_cost": 44850.61784631873
+    }
+  ],
+  "assumptions": [
+    "队友清洗数据：同客户均值填补",
+    "客户总需求允许按重量与体积同比例拆分给多辆车",
+    "同一物理车辆可在返回配送中心后执行多趟任务，启动成本每天只计一次",
+    "车速使用题面正态分布的均值，并按跨时段分段行驶",
+    "按清洗说明假设 17:00-19:00 为晚高峰 9.8 km/h，19:00 后为顺畅 55.3 km/h",
+    "载荷能耗增幅按重量/容积利用率最大值线性插值"
+  ]
+}

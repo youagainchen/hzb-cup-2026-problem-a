@@ -37,9 +37,9 @@ tools/               非求解代码的辅助工具
 4. 1 号实现 `evaluator.py`，先通过手算与可行性检查，再开始优化。
 5. 路线、图表与三问结果都调用同一评估器。
 
-## 问题一基线代码
+## 问题一优化代码
 
-当前版本实现“软时间窗感知的拆分配送贪心 + 路线内 2-opt + 跨路线配送块搬移”：
+当前版本统一按完整成本进行搜索，包含：不受全天车辆数限制的成本感知 Clarke-Wright、同客户需求重新拆分、低装载路线消除、2-opt、relocate、swap、route merge、车型与物理车辆联合分配、10 分钟粒度发车时间优化，以及“一辆物理车执行多趟任务”的排班优化。`vehicle.count` 只约束同一时刻可启用的物理车辆数，不再错误限制全天趟次数；车辆返回配送中心后可再次出车，400 元启动成本每天只对该物理车辆计算一次。
 
 ```powershell
 python -m pip install -r requirements-dev.txt
@@ -47,13 +47,17 @@ python -m pytest -q
 python -m src.main
 ```
 
-程序会读取 `data/raw/`，并输出：
+程序默认严格读取 `data/processed/team_cleaned/` 中的队友清洗数据，并输出：
 
-- `results/routes/question1_baseline_routes.csv`：逐车、逐站配送路线与到达时间；
-- `results/tables/question1_baseline_route_summary.csv`：车辆使用和分项成本；
-- `results/tables/question1_baseline_totals.json`：总成本、总里程、碳排放及建模假设。
+- `results/routes/question1_optimized_routes.csv`：逐车、逐站配送路线与到达时间；
+- `results/tables/question1_optimized_route_summary.csv`：物理车辆、趟次、发车时间和分项成本；
+- `results/tables/question1_optimized_totals.json`：总成本、分项成本、总里程、碳排放、车辆数下界及建模假设。
+- `results/routes/question1_balanced_49_routes.csv` 与对应表格：49 辆低迟到稳健方案；
+- `results/figures/question1_*.svg`：成本构成、路线、装载率、车辆甘特图和优化轨迹。
 
-这是一套可复现的改进初始解，不是最终最优解。下一步应在同一评估器上加入跨路线交换、车辆类型重分配，再升级为 ALNS。
+当前清洗数据的确定性结果为：纯成本最优方案 99 趟、33 辆、44,850.62 元；49 辆稳健方案同为 99 趟、46,705.83 元，但等待与迟到成本由 12,105.16 元降至 3,443.84 元。由于第一问的目标是总成本最小，应选择 33 辆方案作为最终方案，49 辆方案仅用于敏感性与时效权衡分析。论文还应明确说明“允许车辆返回配送中心后多趟配送”属于模型假设。
+
+可用 `--initial greedy` 或 `--initial savings` 固定初始解，使用 `--no-local-search` 做初始解消融；也可用 `--data-dir data/raw` 回跑原始数据。当前仍是确定性启发式结果，不保证全局最优；下一阶段可在同一评估器上升级为 ALNS。
 
 ## 协作约定
 

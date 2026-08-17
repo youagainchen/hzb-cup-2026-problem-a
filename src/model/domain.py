@@ -41,10 +41,14 @@ class Route:
     vehicle_number: int
     deliveries: list[Delivery] = field(default_factory=list)
     start_minutes: float = 8.0 * 60.0
+    trip_number: int = 1
 
     @property
     def route_id(self) -> str:
-        return f"{self.vehicle_type.name}-{self.vehicle_number:03d}"
+        return (
+            f"{self.vehicle_type.name}-{self.vehicle_number:03d}"
+            f"-T{self.trip_number:02d}"
+        )
 
     @property
     def total_weight(self) -> float:
@@ -64,8 +68,9 @@ class ProblemData:
     all_customer_ids: tuple[int, ...]
     imputed_weight_rows: int = 0
     imputed_volume_rows: int = 0
+    data_source: str = "raw"
+    missing_value_policy: str = "同客户中位数填补"
 
     @property
     def active_customer_ids(self) -> tuple[int, ...]:
         return tuple(sorted(self.demands))
-

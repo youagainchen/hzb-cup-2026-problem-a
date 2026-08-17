@@ -117,7 +117,10 @@ def validate_solution(problem: ProblemData, routes: list[Route]) -> None:
     delivered: dict[int, list[float]] = {
         customer_id: [0.0, 0.0] for customer_id in problem.demands
     }
-    used = Counter(route.vehicle_type.name for route in routes)
+    used_vehicle_keys = {
+        (route.vehicle_type.name, route.vehicle_number) for route in routes
+    }
+    used = Counter(vehicle_name for vehicle_name, _ in used_vehicle_keys)
     fleet = {vehicle.name: vehicle.count for vehicle in DEFAULT_VEHICLE_TYPES}
 
     for route in routes:

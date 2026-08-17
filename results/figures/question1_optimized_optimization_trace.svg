@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+<title>优化过程成本变化</title>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="Microsoft YaHei, SimHei, Arial, sans-serif" fill="#263238">
+<text x="490.0" y="34" text-anchor="middle" font-size="22" font-weight="500">优化过程成本变化</text>
+<polyline points="90.00,70.00 182.22,119.52 274.44,215.45 366.67,355.39 458.89,410.00 551.11,410.00 643.33,410.00 735.56,371.67 827.78,371.67 920.00,410.00" fill="none" stroke="#4C78A8" stroke-width="2"/>
+<circle cx="90.00" cy="70.00" r="4" fill="#4C78A8"/>
+<text x="90.00" y="435" text-anchor="end" font-size="10" transform="rotate(-28 90.00 435)">initial_savings</text>
+<circle cx="182.22" cy="119.52" r="4" fill="#4C78A8"/>
+<text x="182.22" y="435" text-anchor="end" font-size="10" transform="rotate(-28 182.22 435)">eliminate_low_load</text>
+<circle cx="274.44" cy="215.45" r="4" fill="#4C78A8"/>
+<text x="274.44" y="435" text-anchor="end" font-size="10" transform="rotate(-28 274.44 435)">two_opt_1</text>
+<circle cx="366.67" cy="355.39" r="4" fill="#4C78A8"/>
+<text x="366.67" y="435" text-anchor="end" font-size="10" transform="rotate(-28 366.67 435)">relocate</text>
+<circle cx="458.89" cy="410.00" r="4" fill="#4C78A8"/>
+<text x="458.89" y="435" text-anchor="end" font-size="10" transform="rotate(-28 458.89 435)">swap</text>
+<circle cx="551.11" cy="410.00" r="4" fill="#4C78A8"/>
+<text x="551.11" y="435" text-anchor="end" font-size="10" transform="rotate(-28 551.11 435)">route_merge</text>
+<circle cx="643.33" cy="410.00" r="4" fill="#4C78A8"/>
+<text x="643.33" y="435" text-anchor="end" font-size="10" transform="rotate(-28 643.33 435)">select_vehicle</text>
+<circle cx="735.56" cy="371.67" r="4" fill="#4C78A8"/>
+<text x="735.56" y="435" text-anchor="end" font-size="10" transform="rotate(-28 735.56 435)">eliminate_low_load_2</text>
+<circle cx="827.78" cy="371.67" r="4" fill="#4C78A8"/>
+<text x="827.78" y="435" text-anchor="end" font-size="10" transform="rotate(-28 827.78 435)">two_opt_2</text>
+<circle cx="920.00" cy="410.00" r="4" fill="#4C78A8"/>
+<text x="920.00" y="435" text-anchor="end" font-size="10" transform="rotate(-28 920.00 435)">best_solution_restored</text>
+<text x="25" y="240.0" text-anchor="middle" font-size="14" transform="rotate(-90 25 240.0)">总成本（元）</text>
+</g>
+</svg>

@@ -43,7 +43,15 @@ def _impute_orders(orders: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
 
 def load_problem_data(data_dir: str | Path) -> ProblemData:
     data_path = Path(data_dir)
-    required = {
+    cleaned_files = {
+        "orders": data_path / "订单信息_清洗后.xlsx",
+        "demand_summary": data_path / "客户需求汇总_清洗后.xlsx",
+        "distance": data_path / "距离矩阵_清洗后.xlsx",
+        "windows": data_path / "时间窗_清洗后.xlsx",
+        "coordinates": data_path / "客户坐标信息_清洗后.xlsx",
+    }
+    use_cleaned = all(path.exists() for path in cleaned_files.values())
+    required = cleaned_files if use_cleaned else {
         "orders": data_path / "订单信息.xlsx",
         "distance": data_path / "距离矩阵.xlsx",
         "windows": data_path / "时间窗.xlsx",
@@ -53,31 +61,61 @@ def load_problem_data(data_dir: str | Path) -> ProblemData:
     if missing:
         raise FileNotFoundError(f"缺少数据文件: {missing}")
 
-    raw_orders = pd.read_excel(required["orders"])
-    orders, missing_weight, missing_volume = _impute_orders(raw_orders)
-    demand_frame = orders.groupby("目标客户编号", as_index=True)[["重量", "体积"]].sum()
-    demands = {
-        int(customer_id): (float(row["重量"]), float(row["体积"]))
-        for customer_id, row in demand_frame.iterrows()
-        if float(row["重量"]) > 1e-9 or float(row["体积"]) > 1e-9
-    }
+    if use_cleaned:
+        orders = pd.read_excel(required["orders"])
+        missing_weight = int(orders["重量_是否填充"].sum())
+        missing_volume = int(orders["体积_是否填充"].sum())
+        demand_frame = pd.read_excel(required["demand_summary"])
+        demands = {
+            int(row["客户编号"]): (
+                float(row["总重量_kg"]),
+                float(row["总体积_m3"]),
+            )
+            for _, row in demand_frame.iterrows()
+            if int(row["是否待服务"]) == 1
+        }
+        window_frame = pd.read_excel(required["windows"])
+        windows = {
+            int(row["客户编号"]): (
+                float(row["开始时间_分钟"]),
+                float(row["结束时间_分钟"]),
+            )
+            for _, row in window_frame.iterrows()
+        }
+        coordinate_frame = pd.read_excel(required["coordinates"])
+        coordinates = {
+            int(row["ID"]): (float(row["X_km"]), float(row["Y_km"]))
+            for _, row in coordinate_frame.iterrows()
+        }
+        data_source = str(data_path.resolve())
+        missing_value_policy = "队友清洗数据：同客户均值填补"
+    else:
+        raw_orders = pd.read_excel(required["orders"])
+        orders, missing_weight, missing_volume = _impute_orders(raw_orders)
+        demand_frame = orders.groupby("目标客户编号", as_index=True)[["重量", "体积"]].sum()
+        demands = {
+            int(customer_id): (float(row["重量"]), float(row["体积"]))
+            for customer_id, row in demand_frame.iterrows()
+            if float(row["重量"]) > 1e-9 or float(row["体积"]) > 1e-9
+        }
+        window_frame = pd.read_excel(required["windows"])
+        windows = {
+            int(row["客户编号"]): (
+                _time_to_minutes(row["开始时间"]),
+                _time_to_minutes(row["结束时间"]),
+            )
+            for _, row in window_frame.iterrows()
+        }
+        coordinate_frame = pd.read_excel(required["coordinates"])
+        coordinates = {
+            int(row["ID"]): (float(row["X (km)"]), float(row["Y (km)"]))
+            for _, row in coordinate_frame.iterrows()
+        }
+        data_source = str(data_path.resolve())
+        missing_value_policy = "运行时同客户中位数填补"
 
-    window_frame = pd.read_excel(required["windows"])
-    windows = {
-        int(row["客户编号"]): (
-            _time_to_minutes(row["开始时间"]),
-            _time_to_minutes(row["结束时间"]),
-        )
-        for _, row in window_frame.iterrows()
-    }
     if any(start > end for start, end in windows.values()):
         raise ValueError("存在开始时间晚于结束时间的时间窗")
-
-    coordinate_frame = pd.read_excel(required["coordinates"])
-    coordinates = {
-        int(row["ID"]): (float(row["X (km)"]), float(row["Y (km)"]))
-        for _, row in coordinate_frame.iterrows()
-    }
 
     distance_frame = pd.read_excel(required["distance"], index_col=0)
     distance_frame.index = distance_frame.index.astype(int)
@@ -109,5 +147,6 @@ def load_problem_data(data_dir: str | Path) -> ProblemData:
         all_customer_ids=all_customer_ids,
         imputed_weight_rows=missing_weight,
         imputed_volume_rows=missing_volume,
+        data_source=data_source,
+        missing_value_policy=missing_value_policy,
     )
-

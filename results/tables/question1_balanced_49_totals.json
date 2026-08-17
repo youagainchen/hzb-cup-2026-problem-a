@@ -1,0 +1,59 @@
+{
+  "solution_variant": "balanced_49",
+  "algorithm": "best of cost-aware Clarke-Wright and time-window greedy + route elimination + 2-opt + relocate + swap + route merge + global vehicle assignment + departure-time optimization + multi-trip physical-vehicle scheduling",
+  "data_source": "D:\\Tencent Files\\A题\\data\\processed\\team_cleaned",
+  "active_customers": 88,
+  "no_order_customers": 10,
+  "delivery_trips": 99,
+  "physical_vehicles": 49,
+  "trip_count_capacity_lower_bound": 96,
+  "trip_usage_by_type": {
+    "EV-3000": 26,
+    "FUEL-3000": 73
+  },
+  "physical_vehicle_usage": {
+    "EV-3000": 10,
+    "FUEL-3000": 39
+  },
+  "imputed_weight_rows": 14,
+  "imputed_volume_rows": 16,
+  "total_distance_km": 11459.62230882674,
+  "fuel_liters": 2186.356338850982,
+  "electricity_kwh": 1731.8441543490835,
+  "total_emissions_kg": 6436.303516382342,
+  "fixed_cost": 19600.0,
+  "energy_cost": 19478.39615178847,
+  "carbon_cost": 4183.597285648522,
+  "waiting_cost": 518.1977963961257,
+  "late_cost": 2925.6434966080087,
+  "total_cost": 46705.83473044113,
+  "cost_share": {
+    "fixed": 0.4196477830472313,
+    "energy": 0.41704417155172213,
+    "carbon": 0.08957333296351107,
+    "waiting": 0.011094926348856872,
+    "late": 0.06263978608867861
+  },
+  "optimization_trace": [
+    {
+      "stage": "balanced_49",
+      "vehicles": 49,
+      "trips": 99,
+      "distance_km": 11459.62230882674,
+      "fixed_cost": 19600.0,
+      "energy_cost": 19478.39615178847,
+      "carbon_cost": 4183.597285648522,
+      "waiting_cost": 518.1977963961257,
+      "late_cost": 2925.6434966080087,
+      "total_cost": 46705.83473044113
+    }
+  ],
+  "assumptions": [
+    "队友清洗数据：同客户均值填补",
+    "客户总需求允许按重量与体积同比例拆分给多辆车",
+    "同一物理车辆可在返回配送中心后执行多趟任务，启动成本每天只计一次",
+    "车速使用题面正态分布的均值，并按跨时段分段行驶",
+    "按清洗说明假设 17:00-19:00 为晚高峰 9.8 km/h，19:00 后为顺畅 55.3 km/h",
+    "载荷能耗增幅按重量/容积利用率最大值线性插值"
+  ]
+}

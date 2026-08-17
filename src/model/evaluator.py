@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import inf, isinf
 
 from src.model.domain import ProblemData, Route
@@ -43,10 +43,27 @@ class RouteEvaluation:
     stops: tuple[StopResult, ...]
 
 
+@dataclass(frozen=True)
+class SolutionEvaluation:
+    vehicle_count: int
+    trip_count: int
+    total_distance_km: float
+    fuel_liters: float
+    electricity_kwh: float
+    emissions_kg: float
+    fixed_cost: float
+    energy_cost: float
+    carbon_cost: float
+    waiting_cost: float
+    late_cost: float
+    total_cost: float
+    routes: tuple[RouteEvaluation, ...]
+
+
 class RouteEvaluator:
     """用期望车速评估路线；软时间窗允许迟到但计罚款。"""
 
-    _BOUNDARIES = (540.0, 600.0, 690.0, 780.0, 900.0, 1020.0)
+    _BOUNDARIES = (480.0, 540.0, 600.0, 690.0, 780.0, 900.0, 1020.0, 1140.0, 1440.0)
 
     def __init__(self, problem: ProblemData):
         self.problem = problem
@@ -66,17 +83,18 @@ class RouteEvaluator:
             return 55.3
         if 900.0 <= minute < 1020.0:
             return 35.4
-        # 题面未给 17:00 后速度；基线暂按顺畅期望速度处理。
-        if minute >= 1020.0:
-            return 55.3
-        return 35.4
+        if 1020.0 <= minute < 1140.0:
+            return 9.8
+        return 55.3
 
     @classmethod
     def _next_boundary(cls, clock_minutes: float) -> float:
+        minute = clock_minutes % (24.0 * 60.0)
+        day_base = clock_minutes - minute
         for boundary in cls._BOUNDARIES:
-            if boundary > clock_minutes + 1e-9:
-                return boundary
-        return inf
+            if boundary > minute + 1e-9:
+                return day_base + boundary
+        return day_base + 24.0 * 60.0
 
     @staticmethod
     def _energy_per_100km(propulsion: str, speed: float) -> float:
@@ -230,6 +248,74 @@ class RouteEvaluator:
             candidate += step_minutes
         route.start_minutes = best.start_minutes
         return best
+
+
+def evaluate_solution(
+    routes: list[Route],
+    evaluator: RouteEvaluator,
+    optimize_departures: bool = True,
+) -> SolutionEvaluation:
+    """用同一评估器汇总完整成本，保证所有搜索算子采用相同口径。"""
+
+    raw_results = tuple(
+        evaluator.best_departure(route)
+        if optimize_departures
+        else evaluator.evaluate(route, route.start_minutes)
+        for route in routes
+    )
+    all_vehicles: set[tuple[str, int]] = set()
+    charged_vehicles: set[tuple[str, int]] = set()
+    adjusted_results: list[RouteEvaluation] = []
+    for route, result in zip(routes, raw_results, strict=True):
+        vehicle_key = (route.vehicle_type.name, route.vehicle_number)
+        all_vehicles.add(vehicle_key)
+        fixed_cost = 0.0
+        if route.trip_number == 1 and vehicle_key not in charged_vehicles:
+            fixed_cost = route.vehicle_type.fixed_cost
+            charged_vehicles.add(vehicle_key)
+        adjusted_results.append(
+            replace(
+                result,
+                fixed_cost=fixed_cost,
+                total_cost=result.total_cost - result.fixed_cost + fixed_cost,
+            )
+        )
+    route_results = tuple(adjusted_results)
+    fuel_liters = sum(
+        result.energy_amount
+        for route, result in zip(routes, route_results, strict=True)
+        if route.vehicle_type.propulsion == "fuel"
+    )
+    electricity_kwh = sum(
+        result.energy_amount
+        for route, result in zip(routes, route_results, strict=True)
+        if route.vehicle_type.propulsion == "electric"
+    )
+    fixed_cost = sum(result.fixed_cost for result in route_results)
+    energy_cost = sum(result.energy_cost for result in route_results)
+    carbon_cost = sum(result.carbon_cost for result in route_results)
+    waiting_cost = sum(result.waiting_cost for result in route_results)
+    late_cost = sum(result.late_cost for result in route_results)
+    total_cost = sum(result.total_cost for result in route_results)
+    component_total = fixed_cost + energy_cost + carbon_cost + waiting_cost + late_cost
+    if abs(total_cost - component_total) > 1e-6:
+        raise AssertionError("总成本与分项成本之和不一致")
+
+    return SolutionEvaluation(
+        vehicle_count=len(all_vehicles),
+        trip_count=len(routes),
+        total_distance_km=sum(result.distance_km for result in route_results),
+        fuel_liters=fuel_liters,
+        electricity_kwh=electricity_kwh,
+        emissions_kg=sum(result.emissions_kg for result in route_results),
+        fixed_cost=fixed_cost,
+        energy_cost=energy_cost,
+        carbon_cost=carbon_cost,
+        waiting_cost=waiting_cost,
+        late_cost=late_cost,
+        total_cost=total_cost,
+        routes=route_results,
+    )
 
 
 def format_clock(minutes: float) -> str:

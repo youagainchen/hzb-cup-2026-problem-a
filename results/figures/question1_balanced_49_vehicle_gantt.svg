@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1276" viewBox="0 0 1100 1276">
+<title>物理车辆多趟配送甘特图</title>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="Microsoft YaHei, SimHei, Arial, sans-serif" fill="#263238">
+<text x="550.0" y="34" text-anchor="middle" font-size="22" font-weight="500">物理车辆多趟配送甘特图</text>
+<line x1="160.00" y1="57" x2="160.00" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="160.00" y="1264" text-anchor="middle" font-size="11">08:00</text>
+<line x1="262.13" y1="57" x2="262.13" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="262.13" y="1264" text-anchor="middle" font-size="11">10:00</text>
+<line x1="364.26" y1="57" x2="364.26" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="364.26" y="1264" text-anchor="middle" font-size="11">12:00</text>
+<line x1="466.39" y1="57" x2="466.39" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="466.39" y="1264" text-anchor="middle" font-size="11">14:00</text>
+<line x1="568.52" y1="57" x2="568.52" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="568.52" y="1264" text-anchor="middle" font-size="11">16:00</text>
+<line x1="670.65" y1="57" x2="670.65" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="670.65" y="1264" text-anchor="middle" font-size="11">18:00</text>
+<line x1="772.78" y1="57" x2="772.78" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="772.78" y="1264" text-anchor="middle" font-size="11">20:00</text>
+<line x1="874.91" y1="57" x2="874.91" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="874.91" y="1264" text-anchor="middle" font-size="11">22:00</text>
+<line x1="977.04" y1="57" x2="977.04" y2="1241" stroke="#D9DEE7" stroke-width="1"/>
+<text x="977.04" y="1264" text-anchor="middle" font-size="11">D+1 00:00</text>
+<text x="152" y="79" text-anchor="end" font-size="11">EV-3000-001</text>
+<rect x="491.92" y="65" width="370.63" height="17" fill="#54A24B"/>
+<rect x="862.55" y="65" width="138.99" height="17" fill="#54A24B"/>
+<text x="152" y="103" text-anchor="end" font-size="11">EV-3000-002</text>
+<rect x="202.55" y="89" width="327.04" height="17" fill="#54A24B"/>
+<rect x="529.59" y="89" width="310.93" height="17" fill="#54A24B"/>
+<rect x="840.52" y="89" width="138.99" height="17" fill="#54A24B"/>
+<text x="152" y="127" text-anchor="end" font-size="11">EV-3000-003</text>
+<rect x="270.64" y="113" width="516.08" height="17" fill="#54A24B"/>
+<rect x="786.72" y="113" width="154.98" height="17" fill="#54A24B"/>
+<text x="152" y="151" text-anchor="end" font-size="11">EV-3000-004</text>
+<rect x="262.13" y="137" width="637.26" height="17" fill="#54A24B"/>
+<rect x="899.39" y="137" width="138.99" height="17" fill="#54A24B"/>
+<text x="152" y="175" text-anchor="end" font-size="11">EV-3000-005</text>
+<rect x="236.60" y="161" width="600.28" height="17" fill="#54A24B"/>
+<rect x="836.88" y="161" width="147.21" height="17" fill="#54A24B"/>
+<text x="152" y="199" text-anchor="end" font-size="11">EV-3000-006</text>
+<rect x="168.51" y="185" width="356.65" height="17" fill="#54A24B"/>
+<rect x="525.16" y="185" width="312.52" height="17" fill="#54A24B"/>
+<rect x="837.68" y="185" width="147.21" height="17" fill="#54A24B"/>
+<text x="152" y="223" text-anchor="end" font-size="11">EV-3000-007</text>
+<rect x="330.22" y="209" width="445.69" height="17" fill="#54A24B"/>
+<rect x="775.91" y="209" width="165.60" height="17" fill="#54A24B"/>
+<rect x="941.51" y="209" width="107.77" height="17" fill="#54A24B"/>
+<text x="152" y="247" text-anchor="end" font-size="11">EV-3000-008</text>
+<rect x="321.71" y="233" width="447.46" height="17" fill="#54A24B"/>
+<rect x="769.16" y="233" width="165.60" height="17" fill="#54A24B"/>
+<rect x="934.76" y="233" width="130.24" height="17" fill="#54A24B"/>
+<text x="152" y="271" text-anchor="end" font-size="11">EV-3000-009</text>
+<rect x="313.19" y="257" width="304.66" height="17" fill="#54A24B"/>
+<rect x="617.86" y="257" width="266.20" height="17" fill="#54A24B"/>
+<rect x="884.06" y="257" width="138.99" height="17" fill="#54A24B"/>
+<text x="152" y="295" text-anchor="end" font-size="11">EV-3000-010</text>
+<rect x="483.41" y="281" width="296.21" height="17" fill="#54A24B"/>
+<rect x="779.62" y="281" width="161.82" height="17" fill="#54A24B"/>
+<rect x="941.44" y="281" width="111.13" height="17" fill="#54A24B"/>
+<text x="152" y="319" text-anchor="end" font-size="11">FUEL-3000-001</text>
+<rect x="457.88" y="305" width="351.67" height="17" fill="#F58518"/>
+<text x="152" y="343" text-anchor="end" font-size="11">FUEL-3000-002</text>
+<rect x="236.60" y="329" width="245.19" height="17" fill="#F58518"/>
+<rect x="481.78" y="329" width="375.92" height="17" fill="#F58518"/>
+<text x="152" y="367" text-anchor="end" font-size="11">FUEL-3000-003</text>
+<rect x="236.60" y="353" width="245.19" height="17" fill="#F58518"/>
+<rect x="558.38" y="353" width="209.62" height="17" fill="#F58518"/>
+<text x="152" y="391" text-anchor="end" font-size="11">FUEL-3000-004</text>
+<rect x="236.60" y="377" width="245.19" height="17" fill="#F58518"/>
+<rect x="481.78" y="377" width="271.77" height="17" fill="#F58518"/>
+<text x="152" y="415" text-anchor="end" font-size="11">FUEL-3000-005</text>
+<rect x="406.81" y="401" width="185.11" height="17" fill="#F58518"/>
+<rect x="728.10" y="401" width="107.29" height="17" fill="#F58518"/>
+<text x="152" y="439" text-anchor="end" font-size="11">FUEL-3000-006</text>
+<rect x="211.06" y="425" width="250.18" height="17" fill="#F58518"/>
+<rect x="461.25" y="425" width="157.13" height="17" fill="#F58518"/>
+<rect x="729.02" y="425" width="93.73" height="17" fill="#F58518"/>
+<text x="152" y="463" text-anchor="end" font-size="11">FUEL-3000-007</text>
+<rect x="219.58" y="449" width="230.20" height="17" fill="#F58518"/>
+<rect x="449.78" y="449" width="203.09" height="17" fill="#F58518"/>
+<text x="152" y="487" text-anchor="end" font-size="11">FUEL-3000-008</text>
+<rect x="406.81" y="473" width="165.27" height="17" fill="#F58518"/>
+<rect x="580.59" y="473" width="237.56" height="17" fill="#F58518"/>
+<text x="152" y="511" text-anchor="end" font-size="11">FUEL-3000-009</text>
+<rect x="245.11" y="497" width="218.24" height="17" fill="#F58518"/>
+<rect x="471.86" y="497" width="178.04" height="17" fill="#F58518"/>
+<rect x="726.50" y="497" width="81.71" height="17" fill="#F58518"/>
+<text x="152" y="535" text-anchor="end" font-size="11">FUEL-3000-010</text>
+<rect x="236.60" y="521" width="523.08" height="17" fill="#F58518"/>
+<text x="152" y="559" text-anchor="end" font-size="11">FUEL-3000-011</text>
+<rect x="219.58" y="545" width="217.04" height="17" fill="#F58518"/>
+<rect x="436.61" y="545" width="160.60" height="17" fill="#F58518"/>
+<rect x="724.87" y="545" width="107.29" height="17" fill="#F58518"/>
+<text x="152" y="583" text-anchor="end" font-size="11">FUEL-3000-012</text>
+<rect x="219.58" y="569" width="217.04" height="17" fill="#F58518"/>
+<rect x="436.61" y="569" width="160.60" height="17" fill="#F58518"/>
+<rect x="724.87" y="569" width="107.29" height="17" fill="#F58518"/>
+<text x="152" y="607" text-anchor="end" font-size="11">FUEL-3000-013</text>
+<rect x="253.62" y="593" width="245.04" height="17" fill="#F58518"/>
+<rect x="541.21" y="593" width="213.56" height="17" fill="#F58518"/>
+<text x="152" y="631" text-anchor="end" font-size="11">FUEL-3000-014</text>
+<rect x="253.62" y="617" width="246.80" height="17" fill="#F58518"/>
+<rect x="542.97" y="617" width="212.11" height="17" fill="#F58518"/>
+<text x="152" y="655" text-anchor="end" font-size="11">FUEL-3000-015</text>
+<rect x="304.68" y="641" width="427.84" height="17" fill="#F58518"/>
+<text x="152" y="679" text-anchor="end" font-size="11">FUEL-3000-016</text>
+<rect x="330.22" y="665" width="188.80" height="17" fill="#F58518"/>
+<rect x="689.23" y="665" width="137.73" height="17" fill="#F58518"/>
+<text x="152" y="703" text-anchor="end" font-size="11">FUEL-3000-017</text>
+<rect x="330.22" y="689" width="188.80" height="17" fill="#F58518"/>
+<rect x="689.23" y="689" width="137.73" height="17" fill="#F58518"/>
+<text x="152" y="727" text-anchor="end" font-size="11">FUEL-3000-018</text>
+<rect x="372.77" y="713" width="161.54" height="17" fill="#F58518"/>
+<rect x="542.82" y="713" width="248.17" height="17" fill="#F58518"/>
+<text x="152" y="751" text-anchor="end" font-size="11">FUEL-3000-019</text>
+<rect x="432.35" y="737" width="118.60" height="17" fill="#F58518"/>
+<rect x="550.94" y="737" width="199.15" height="17" fill="#F58518"/>
+<text x="152" y="775" text-anchor="end" font-size="11">FUEL-3000-020</text>
+<rect x="432.35" y="761" width="118.60" height="17" fill="#F58518"/>
+<rect x="550.94" y="761" width="199.15" height="17" fill="#F58518"/>
+<text x="152" y="799" text-anchor="end" font-size="11">FUEL-3000-021</text>
+<rect x="432.35" y="785" width="118.60" height="17" fill="#F58518"/>
+<rect x="559.45" y="785" width="194.31" height="17" fill="#F58518"/>
+<text x="152" y="823" text-anchor="end" font-size="11">FUEL-3000-022</text>
+<rect x="211.06" y="809" width="137.97" height="17" fill="#F58518"/>
+<rect x="553.30" y="809" width="198.03" height="17" fill="#F58518"/>
+<text x="152" y="847" text-anchor="end" font-size="11">FUEL-3000-023</text>
+<rect x="551.50" y="833" width="207.42" height="17" fill="#F58518"/>
+<text x="152" y="871" text-anchor="end" font-size="11">FUEL-3000-024</text>
+<rect x="560.01" y="857" width="188.71" height="17" fill="#F58518"/>
+<text x="152" y="895" text-anchor="end" font-size="11">FUEL-3000-025</text>
+<rect x="560.01" y="881" width="188.71" height="17" fill="#F58518"/>
+<text x="152" y="919" text-anchor="end" font-size="11">FUEL-3000-026</text>
+<rect x="500.43" y="905" width="157.08" height="17" fill="#F58518"/>
+<text x="152" y="943" text-anchor="end" font-size="11">FUEL-3000-027</text>
+<rect x="500.43" y="929" width="157.08" height="17" fill="#F58518"/>
+<text x="152" y="967" text-anchor="end" font-size="11">FUEL-3000-028</text>
+<rect x="287.66" y="953" width="159.47" height="17" fill="#F58518"/>
+<rect x="566.28" y="953" width="177.49" height="17" fill="#F58518"/>
+<text x="152" y="991" text-anchor="end" font-size="11">FUEL-3000-029</text>
+<rect x="228.09" y="977" width="124.67" height="17" fill="#F58518"/>
+<rect x="574.04" y="977" width="177.07" height="17" fill="#F58518"/>
+<text x="152" y="1015" text-anchor="end" font-size="11">FUEL-3000-030</text>
+<rect x="568.52" y="1001" width="171.50" height="17" fill="#F58518"/>
+<text x="152" y="1039" text-anchor="end" font-size="11">FUEL-3000-031</text>
+<rect x="568.52" y="1025" width="171.50" height="17" fill="#F58518"/>
+<text x="152" y="1063" text-anchor="end" font-size="11">FUEL-3000-032</text>
+<rect x="568.52" y="1049" width="171.50" height="17" fill="#F58518"/>
+<text x="152" y="1087" text-anchor="end" font-size="11">FUEL-3000-033</text>
+<rect x="568.52" y="1073" width="168.84" height="17" fill="#F58518"/>
+<text x="152" y="1111" text-anchor="end" font-size="11">FUEL-3000-034</text>
+<rect x="287.66" y="1097" width="147.00" height="17" fill="#F58518"/>
+<rect x="451.68" y="1097" width="106.62" height="17" fill="#F58518"/>
+<rect x="609.36" y="1097" width="128.98" height="17" fill="#F58518"/>
+<text x="152" y="1135" text-anchor="end" font-size="11">FUEL-3000-035</text>
+<rect x="287.66" y="1121" width="147.00" height="17" fill="#F58518"/>
+<rect x="477.21" y="1121" width="88.37" height="17" fill="#F58518"/>
+<text x="152" y="1159" text-anchor="end" font-size="11">FUEL-3000-036</text>
+<rect x="287.66" y="1145" width="147.00" height="17" fill="#F58518"/>
+<rect x="477.21" y="1145" width="88.37" height="17" fill="#F58518"/>
+<text x="152" y="1183" text-anchor="end" font-size="11">FUEL-3000-037</text>
+<rect x="287.66" y="1169" width="147.00" height="17" fill="#F58518"/>
+<rect x="604.87" y="1169" width="130.59" height="17" fill="#F58518"/>
+<text x="152" y="1207" text-anchor="end" font-size="11">FUEL-3000-038</text>
+<rect x="262.13" y="1193" width="70.03" height="17" fill="#F58518"/>
+<rect x="332.16" y="1193" width="112.58" height="17" fill="#F58518"/>
+<rect x="444.74" y="1193" width="47.92" height="17" fill="#F58518"/>
+<rect x="722.45" y="1193" width="47.55" height="17" fill="#F58518"/>
+<text x="152" y="1231" text-anchor="end" font-size="11">FUEL-3000-039</text>
+<rect x="262.13" y="1217" width="70.03" height="17" fill="#F58518"/>
+<rect x="332.16" y="1217" width="216.47" height="17" fill="#F58518"/>
+</g>
+</svg>
