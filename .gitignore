@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Office temporary files
+~$*.docx
+~$*.xlsx
+
+# Local render and scratch output
+tmp/
+*.log
+
+# Superseded long-form team manual kept locally
+/华中杯A题_团队启动执行手册_三天冲刺版.docx
+/docs/archive/
+
+# Original attachment folder retained locally after copying to data/raw
+/附件/
