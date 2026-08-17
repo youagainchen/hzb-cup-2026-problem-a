@@ -9,7 +9,7 @@ from pathlib import Path
 from src.data.loader import load_problem_data
 from src.model.evaluator import RouteEvaluation, RouteEvaluator, format_clock
 from src.solver.greedy import build_greedy_routes, validate_solution
-from src.solver.local_search import improve_routes_two_opt
+from src.solver.local_search import improve_routes_relocate, improve_routes_two_opt
 
 
 def _write_outputs(
@@ -111,7 +111,10 @@ def _write_outputs(
             )
 
     totals = {
-        "algorithm": "time-window-aware split-delivery greedy + intra-route 2-opt",
+        "algorithm": (
+            "time-window-aware split-delivery greedy + intra-route 2-opt "
+            "+ inter-route block relocation"
+        ),
         "active_customers": len(problem.active_customer_ids),
         "zero_demand_customers": len(problem.all_customer_ids) - len(problem.active_customer_ids),
         "routes": len(routes),
@@ -156,6 +159,8 @@ def run(data_dir: Path, output_dir: Path, use_two_opt: bool = True) -> dict[str,
     routes = build_greedy_routes(problem)
     validate_solution(problem, routes)
     if use_two_opt:
+        routes = improve_routes_two_opt(routes, evaluator)
+        routes = improve_routes_relocate(routes, evaluator)
         routes = improve_routes_two_opt(routes, evaluator)
     evaluations = [evaluator.best_departure(route) for route in routes]
     validate_solution(problem, routes)

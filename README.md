@@ -39,9 +39,11 @@ tools/               非求解代码的辅助工具
 
 ## 问题一基线代码
 
-当前版本实现“软时间窗感知的拆分配送贪心 + 路线内 2-opt”：
+当前版本实现“软时间窗感知的拆分配送贪心 + 路线内 2-opt + 跨路线配送块搬移”：
 
 ```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
 python -m src.main
 ```
 
@@ -51,7 +53,7 @@ python -m src.main
 - `results/tables/question1_baseline_route_summary.csv`：车辆使用和分项成本；
 - `results/tables/question1_baseline_totals.json`：总成本、总里程、碳排放及建模假设。
 
-这是一套可复现的初始可行解，不是最终最优解。下一步应在同一评估器上加入跨路线客户搬移、交换、车辆类型重分配，再升级为 ALNS。
+这是一套可复现的改进初始解，不是最终最优解。下一步应在同一评估器上加入跨路线交换、车辆类型重分配，再升级为 ALNS。
 
 ## 协作约定
 

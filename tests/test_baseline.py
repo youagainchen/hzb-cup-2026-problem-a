@@ -4,9 +4,10 @@ import unittest
 
 import numpy as np
 
-from src.model.domain import ProblemData, VehicleType
+from src.model.domain import Delivery, ProblemData, Route, VehicleType
 from src.model.evaluator import RouteEvaluator
 from src.solver.greedy import build_greedy_routes, validate_solution
+from src.solver.local_search import improve_routes_relocate
 
 
 def _problem() -> ProblemData:
@@ -44,6 +45,29 @@ class BaselineTests(unittest.TestCase):
         self.assertGreater(result.energy_cost, 0)
         self.assertGreater(result.carbon_cost, 0)
         self.assertGreaterEqual(result.total_cost, result.fixed_cost)
+
+    def test_inter_route_relocate_can_remove_a_vehicle(self) -> None:
+        problem = ProblemData(
+            distance=np.array(
+                [
+                    [0.0, 10.0, 11.0],
+                    [10.0, 0.0, 1.0],
+                    [11.0, 1.0, 0.0],
+                ]
+            ),
+            demands={1: (40.0, 1.0), 2: (40.0, 1.0)},
+            windows={1: (480.0, 900.0), 2: (480.0, 900.0)},
+            coordinates={0: (0.0, 0.0), 1: (1.0, 0.0), 2: (2.0, 0.0)},
+            all_customer_ids=(1, 2),
+        )
+        vehicle = VehicleType("TEST", "electric", 100.0, 5.0, 2)
+        routes = [
+            Route(vehicle, 1, [Delivery(1, 40.0, 1.0)]),
+            Route(vehicle, 2, [Delivery(2, 40.0, 1.0)]),
+        ]
+        improved = improve_routes_relocate(routes, RouteEvaluator(problem))
+        self.assertEqual(len(improved), 1)
+        self.assertAlmostEqual(improved[0].total_weight, 80.0)
 
 
 if __name__ == "__main__":
