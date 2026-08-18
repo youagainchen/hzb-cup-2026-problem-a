@@ -276,6 +276,133 @@ def eliminate_low_load_routes(
     return working
 
 
+def repack_split_low_load_route(
+    routes: list[Route],
+    evaluator: RouteEvaluator,
+    source_candidate_count: int = 8,
+    maximum_local_cost_increase: float = 1000.0,
+) -> list[Route]:
+    """拆分低装载趟次的配送量，并填入其他路线的零散剩余容量。"""
+
+    working = [
+        Route(
+            route.vehicle_type,
+            route.vehicle_number,
+            clone_deliveries(route.deliveries),
+            route.start_minutes,
+            route.trip_number,
+        )
+        for route in routes
+    ]
+    old_cost = sum(evaluator.best_departure(route).total_cost for route in working)
+    best_candidate: tuple[float, list[Route]] | None = None
+
+    source_indices = sorted(
+        range(len(working)),
+        key=lambda index: route_load_rate(working[index]),
+    )[:source_candidate_count]
+    for source_index in source_indices:
+        source = working[source_index]
+        candidates = [
+            Route(
+                route.vehicle_type,
+                route.vehicle_number,
+                clone_deliveries(route.deliveries),
+                route.start_minutes,
+                route.trip_number,
+            )
+            for index, route in enumerate(working)
+            if index != source_index
+        ]
+        feasible = True
+
+        for source_item in sorted(source.deliveries, key=lambda item: item.weight, reverse=True):
+            remaining_weight = source_item.weight
+            remaining_volume = source_item.volume
+            while remaining_weight > 1e-7 or remaining_volume > 1e-7:
+                best_insertion: tuple[
+                    float,
+                    float,
+                    int,
+                    Route,
+                    float,
+                    float,
+                ] | None = None
+                for target_index, target in enumerate(candidates):
+                    free_weight = target.vehicle_type.capacity_weight - target.total_weight
+                    free_volume = target.vehicle_type.capacity_volume - target.total_volume
+                    fractions = [1.0]
+                    if remaining_weight > 1e-9:
+                        fractions.append(free_weight / remaining_weight)
+                    if remaining_volume > 1e-9:
+                        fractions.append(free_volume / remaining_volume)
+                    fraction = max(0.0, min(fractions))
+                    if fraction <= 1e-7:
+                        continue
+                    chunk = Delivery(
+                        source_item.customer_id,
+                        remaining_weight * fraction,
+                        remaining_volume * fraction,
+                    )
+                    old_target_cost = evaluator.evaluate(
+                        target, target.start_minutes
+                    ).total_cost
+                    same_customer = any(
+                        item.customer_id == chunk.customer_id
+                        for item in target.deliveries
+                    )
+                    positions = (0,) if same_customer else range(len(target.deliveries) + 1)
+                    for position in positions:
+                        deliveries = _target_deliveries_after_move(target, chunk, position)
+                        candidate = Route(
+                            target.vehicle_type,
+                            target.vehicle_number,
+                            deliveries,
+                            target.start_minutes,
+                            target.trip_number,
+                        )
+                        result = evaluator.best_departure(candidate)
+                        delta = result.total_cost - old_target_cost
+                        score = delta / max(fraction, 1e-4)
+                        choice = (
+                            score,
+                            -fraction,
+                            target_index,
+                            candidate,
+                            chunk.weight,
+                            chunk.volume,
+                        )
+                        if best_insertion is None or choice[:2] < best_insertion[:2]:
+                            best_insertion = choice
+
+                if best_insertion is None:
+                    feasible = False
+                    break
+                _, _, target_index, candidate, moved_weight, moved_volume = best_insertion
+                candidates[target_index] = candidate
+                remaining_weight = max(0.0, remaining_weight - moved_weight)
+                remaining_volume = max(0.0, remaining_volume - moved_volume)
+            if not feasible:
+                break
+
+        if not feasible:
+            continue
+        new_cost = sum(
+            evaluator.evaluate(route, route.start_minutes).total_cost
+            for route in candidates
+        )
+        increase = new_cost - old_cost
+        if increase > maximum_local_cost_increase:
+            continue
+        if best_candidate is None or increase < best_candidate[0] - 1e-7:
+            best_candidate = (increase, candidates)
+
+    if best_candidate is None:
+        return working
+    _, result_routes = best_candidate
+    return [improve_route_two_opt(route, evaluator) for route in result_routes]
+
+
 def improve_routes_swap(
     routes: list[Route],
     evaluator: RouteEvaluator,

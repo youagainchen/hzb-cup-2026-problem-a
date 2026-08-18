@@ -2,21 +2,21 @@
 <title>问题一成本构成</title>
 <rect width="100%" height="100%" fill="white"/>
 <g font-family="Microsoft YaHei, SimHei, Arial, sans-serif" fill="#263238">
-<text x="450.0" y="38" text-anchor="middle" font-size="22" font-weight="500">问题一成本构成（总成本 46,705.83 元）</text>
+<text x="450.0" y="38" text-anchor="middle" font-size="22" font-weight="500">问题一成本构成（总成本 48,266.20 元）</text>
 <text x="105" y="115" text-anchor="end" font-size="15">启动</text>
-<rect x="120" y="90" width="600.00" height="34" fill="#4C78A8"/>
-<text x="730.00" y="114" font-size="14">19,600 元（42.0%）</text>
+<rect x="120" y="90" width="574.25" height="34" fill="#4C78A8"/>
+<text x="704.25" y="114" font-size="14">19,600 元（40.6%）</text>
 <text x="105" y="187" text-anchor="end" font-size="15">能源</text>
-<rect x="120" y="162" width="596.28" height="34" fill="#F58518"/>
-<text x="726.28" y="186" font-size="14">19,478 元（41.7%）</text>
+<rect x="120" y="162" width="600.00" height="34" fill="#F58518"/>
+<text x="730.00" y="186" font-size="14">20,479 元（42.4%）</text>
 <text x="105" y="259" text-anchor="end" font-size="15">碳</text>
-<rect x="120" y="234" width="128.07" height="34" fill="#54A24B"/>
-<text x="258.07" y="258" font-size="14">4,184 元（9.0%）</text>
+<rect x="120" y="234" width="129.15" height="34" fill="#54A24B"/>
+<text x="259.15" y="258" font-size="14">4,408 元（9.1%）</text>
 <text x="105" y="331" text-anchor="end" font-size="15">等待</text>
-<rect x="120" y="306" width="15.86" height="34" fill="#72B7B2"/>
-<text x="145.86" y="330" font-size="14">518 元（1.1%）</text>
+<rect x="120" y="306" width="5.72" height="34" fill="#72B7B2"/>
+<text x="135.72" y="330" font-size="14">195 元（0.4%）</text>
 <text x="105" y="403" text-anchor="end" font-size="15">迟到</text>
-<rect x="120" y="378" width="89.56" height="34" fill="#E45756"/>
-<text x="219.56" y="402" font-size="14">2,926 元（6.3%）</text>
+<rect x="120" y="378" width="105.00" height="34" fill="#E45756"/>
+<text x="235.00" y="402" font-size="14">3,584 元（7.4%）</text>
 </g>
 </svg>

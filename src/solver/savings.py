@@ -72,6 +72,7 @@ def _build_parallel_savings_routes(
     problem: ProblemData,
     vehicle_types: tuple[VehicleType, ...] = DEFAULT_VEHICLE_TYPES,
     minimum_gain: float = 0.01,
+    time_window_penalty_km_per_hour: float = 0.0,
 ) -> list[Route]:
     """Clarke-Wright 初始解；合并时以完整成本而非仅距离决定是否接受。"""
 
@@ -102,7 +103,16 @@ def _build_parallel_savings_routes(
             + problem.distance[0, right_customer]
             - problem.distance[left_customer, right_customer]
         )
-        savings.append((float(distance_saving), left.atom_id, right.atom_id))
+        left_window = problem.windows[left_customer]
+        right_window = problem.windows[right_customer]
+        left_midpoint = (left_window[0] + left_window[1]) / 2.0
+        right_midpoint = (right_window[0] + right_window[1]) / 2.0
+        midpoint_gap_hours = abs(left_midpoint - right_midpoint) / 60.0
+        combined_score = (
+            float(distance_saving)
+            - time_window_penalty_km_per_hour * midpoint_gap_hours
+        )
+        savings.append((combined_score, left.atom_id, right.atom_id))
     savings.sort(reverse=True)
 
     for _, left_atom_id, right_atom_id in savings:
@@ -265,7 +275,13 @@ def build_savings_routes(
     problem: ProblemData,
     vehicle_types: tuple[VehicleType, ...] = DEFAULT_VEHICLE_TYPES,
     minimum_gain: float = 0.01,
+    time_window_penalty_km_per_hour: float = 0.0,
 ) -> list[Route]:
     """构造不受全天车辆趟次数限制的并行 Clarke-Wright 初始解。"""
 
-    return _build_parallel_savings_routes(problem, vehicle_types, minimum_gain)
+    return _build_parallel_savings_routes(
+        problem,
+        vehicle_types,
+        minimum_gain,
+        time_window_penalty_km_per_hour,
+    )

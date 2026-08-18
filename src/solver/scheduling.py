@@ -38,6 +38,9 @@ def select_and_schedule_multitrip(
     startup_cost_weight: float = 400.0,
     order_rule: str = "deadline",
     turnaround_minutes: float = 0.0,
+    day_end_minutes: float = 24.0 * 60.0,
+    electric_trip_minimum: int | None = None,
+    electric_trip_limit: int | None = None,
 ) -> list[Route]:
     """联合选择车型、物理车辆和多趟时序。
 
@@ -57,6 +60,15 @@ def select_and_schedule_multitrip(
             float(evaluator.problem.distance[0, item.customer_id])
             for item in route.deliveries
         )
+        nodes = [0, *(item.customer_id for item in route.deliveries), 0]
+        route_distance = sum(
+            float(evaluator.problem.distance[left, right])
+            for left, right in zip(nodes, nodes[1:])
+        )
+        approximate_duration = route_distance / 35.4 * 60.0 + 20.0 * len(route.deliveries)
+        slack = earliest_deadline - 8.0 * 60.0 - approximate_duration
+        if order_rule == "late_risk":
+            return (slack, earliest_deadline, route_distance)
         if order_rule == "long_first":
             return (-depot_distance, earliest_deadline, latest_deadline)
         if order_rule == "tight_first":
@@ -65,8 +77,42 @@ def select_and_schedule_multitrip(
 
     states_by_type: dict[str, list[dict[str, float | int]]] = defaultdict(list)
     selected: list[Route] = []
+    ordered_routes = sorted(routes, key=route_key)
+    fuel_types = tuple(vehicle for vehicle in vehicle_types if vehicle.propulsion == "fuel")
+    requires_electric = [
+        not any(_fits(route.deliveries, vehicle) for vehicle in fuel_types)
+        for route in ordered_routes
+    ]
+    electric_types = tuple(
+        vehicle for vehicle in vehicle_types if vehicle.propulsion == "electric"
+    )
+    electric_capable = [
+        any(_fits(route.deliveries, vehicle) for vehicle in electric_types)
+        for route in ordered_routes
+    ]
+    electric_capable_suffix = [0] * (len(ordered_routes) + 1)
+    for index in range(len(ordered_routes) - 1, -1, -1):
+        electric_capable_suffix[index] = (
+            electric_capable_suffix[index + 1] + int(electric_capable[index])
+        )
+    mandatory_electric_suffix = [0] * (len(ordered_routes) + 1)
+    for index in range(len(ordered_routes) - 1, -1, -1):
+        mandatory_electric_suffix[index] = (
+            mandatory_electric_suffix[index + 1] + int(requires_electric[index])
+        )
+    if (
+        electric_trip_limit is not None
+        and mandatory_electric_suffix[0] > electric_trip_limit
+    ):
+        raise RuntimeError("新能源趟次上限低于容量约束要求的最低新能源趟次数")
+    if (
+        electric_trip_minimum is not None
+        and electric_capable_suffix[0] < electric_trip_minimum
+    ):
+        raise RuntimeError("满足容量约束的新能源候选趟次不足")
+    electric_trip_count = 0
 
-    for source_route in sorted(routes, key=route_key):
+    for route_index, source_route in enumerate(ordered_routes):
         best_choice: tuple[
             float,
             float,
@@ -76,10 +122,32 @@ def select_and_schedule_multitrip(
             int | None,
         ] | None = None
         total_started = sum(len(states) for states in states_by_type.values())
+        electric_due = 0
+        if electric_trip_minimum is not None:
+            electric_due = (
+                electric_trip_minimum * (route_index + 1) + len(ordered_routes) - 1
+            ) // len(ordered_routes)
+        force_electric_now = (
+            electric_trip_minimum is not None
+            and electric_capable[route_index]
+            and electric_trip_count < electric_due
+        )
 
         for vehicle in vehicle_types:
             if not _fits(source_route.deliveries, vehicle):
                 continue
+            if vehicle.propulsion == "fuel" and electric_trip_minimum is not None:
+                future_electric_capable = electric_capable_suffix[route_index + 1]
+                if (
+                    force_electric_now
+                    or electric_trip_count + future_electric_capable < electric_trip_minimum
+                ):
+                    continue
+            if vehicle.propulsion == "electric" and electric_trip_limit is not None:
+                future_mandatory = mandatory_electric_suffix[route_index + 1]
+                reserved_limit = electric_trip_limit - future_mandatory
+                if not requires_electric[route_index] and electric_trip_count >= reserved_limit:
+                    continue
             states = states_by_type[vehicle.name]
 
             if (
@@ -90,7 +158,14 @@ def select_and_schedule_multitrip(
                 )
             ):
                 candidate = _clone_for_vehicle(source_route, vehicle)
-                result = evaluator.best_departure(candidate)
+                try:
+                    result = evaluator.best_departure(
+                        candidate, latest_finish=day_end_minutes
+                    )
+                except ValueError:
+                    result = None
+                if result is None:
+                    continue
                 variable_cost = result.total_cost - vehicle.fixed_cost
                 choice = (
                     variable_cost + startup_cost_weight,
@@ -113,7 +188,16 @@ def select_and_schedule_multitrip(
                 candidate = _clone_for_vehicle(source_route, vehicle)
                 candidate.vehicle_number = int(state["vehicle_number"])
                 candidate.trip_number = int(state["trip_count"]) + 1
-                result = evaluator.best_departure(candidate, earliest=earliest)
+                try:
+                    result = evaluator.best_departure(
+                        candidate,
+                        earliest=earliest,
+                        latest_finish=day_end_minutes,
+                    )
+                except ValueError:
+                    result = None
+                if result is None:
+                    continue
                 variable_cost = result.total_cost - vehicle.fixed_cost
                 choice = (
                     variable_cost,
@@ -147,8 +231,12 @@ def select_and_schedule_multitrip(
             state = states[state_index]
             state["available"] = finish
             state["trip_count"] = int(state["trip_count"]) + 1
+        if candidate.vehicle_type.propulsion == "electric":
+            electric_trip_count += 1
         selected.append(candidate)
 
+    if electric_trip_minimum is not None and electric_trip_count < electric_trip_minimum:
+        raise RuntimeError("未达到指定的新能源趟次数下限")
     return selected
 
 
@@ -276,6 +364,7 @@ def validate_vehicle_schedule(
     routes: list[Route],
     evaluator: RouteEvaluator,
     turnaround_minutes: float = 0.0,
+    day_end_minutes: float = 24.0 * 60.0,
 ) -> None:
     """检查同一物理车辆的各趟次编号连续且时间不重叠。"""
 
@@ -288,6 +377,10 @@ def validate_vehicle_schedule(
         jobs_by_vehicle[key].append(
             (result.start_minutes, result.finish_minutes, route.trip_number)
         )
+        if result.finish_minutes > day_end_minutes + 1e-7:
+            raise AssertionError(
+                f"路线 {route.route_id} 于 {result.finish_minutes:.2f} 分返场，超过当日24:00"
+            )
 
     used_by_type: dict[str, set[int]] = defaultdict(set)
     for (vehicle_name, vehicle_number), jobs in jobs_by_vehicle.items():

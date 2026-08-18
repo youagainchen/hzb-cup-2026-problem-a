@@ -17,6 +17,7 @@ from src.solver.local_search import (
     improve_routes_relocate,
     improve_routes_swap,
     improve_routes_two_opt,
+    repack_split_low_load_route,
 )
 from src.solver.savings import build_savings_routes
 from src.solver.scheduling import select_and_schedule_multitrip, validate_vehicle_schedule
@@ -50,16 +51,19 @@ def _clone_routes(routes):
 
 def _best_multi_trip_schedule(routes, evaluator: RouteEvaluator):
     candidates = []
-    for vehicle_limit in (49, 55, None):
-        for order_rule in ("deadline", "tight_first", "long_first"):
-            for startup_weight in (0.0, 75.0, 100.0, 400.0):
-                scheduled = select_and_schedule_multitrip(
-                    _clone_routes(routes),
-                    evaluator,
-                    max_physical_vehicles=vehicle_limit,
-                    startup_cost_weight=startup_weight,
-                    order_rule=order_rule,
-                )
+    for vehicle_limit in (38, 40, 42, 49, None):
+        for order_rule in ("deadline", "long_first", "late_risk"):
+            for startup_weight in (0.0, 75.0, 100.0):
+                try:
+                    scheduled = select_and_schedule_multitrip(
+                        _clone_routes(routes),
+                        evaluator,
+                        max_physical_vehicles=vehicle_limit,
+                        startup_cost_weight=startup_weight,
+                        order_rule=order_rule,
+                    )
+                except RuntimeError:
+                    continue
                 candidates.append(
                     (
                         scheduled,
@@ -68,7 +72,73 @@ def _best_multi_trip_schedule(routes, evaluator: RouteEvaluator):
                         ),
                     )
                 )
+    if not candidates:
+        raise RuntimeError("没有找到能在当日24:00前完成的多趟配送排班")
     return min(candidates, key=lambda item: item[1].total_cost)
+
+
+def _intensive_multi_trip_schedule(routes, evaluator: RouteEvaluator):
+    """重点搜索38--42辆及30--36个新能源趟次的成本平衡点。"""
+
+    candidates = []
+    best_by_vehicle_count: dict[int, tuple[float, int]] = {}
+    best_by_electric_trip_count: dict[int, tuple[float, int]] = {}
+    for vehicle_limit in range(38, 43):
+        for order_rule in ("deadline", "long_first", "late_risk"):
+            for startup_weight in (0.0, 50.0, 100.0):
+                for electric_target in (23, 24, 26, 28, 30, 32, 34, 36, None):
+                    try:
+                        scheduled = select_and_schedule_multitrip(
+                            _clone_routes(routes),
+                            evaluator,
+                            max_physical_vehicles=vehicle_limit,
+                            startup_cost_weight=startup_weight,
+                            order_rule=order_rule,
+                            electric_trip_minimum=electric_target,
+                            electric_trip_limit=electric_target,
+                        )
+                    except RuntimeError:
+                        continue
+                    result = evaluate_solution(
+                        scheduled, evaluator, optimize_departures=False
+                    )
+                    electric_trips = sum(
+                        route.vehicle_type.propulsion == "electric"
+                        for route in scheduled
+                    )
+                    candidates.append((scheduled, result, electric_trips))
+                    current = best_by_vehicle_count.get(result.vehicle_count)
+                    if current is None or result.total_cost < current[0] - 1e-7:
+                        best_by_vehicle_count[result.vehicle_count] = (
+                            result.total_cost,
+                            electric_trips,
+                        )
+                    electric_current = best_by_electric_trip_count.get(electric_trips)
+                    if (
+                        electric_current is None
+                        or result.total_cost < electric_current[0] - 1e-7
+                    ):
+                        best_by_electric_trip_count[electric_trips] = (
+                            result.total_cost,
+                            result.vehicle_count,
+                        )
+    if not candidates:
+        raise RuntimeError("38--42辆精细搜索没有得到当日可行排班")
+    for vehicle_count, (cost, electric_trips) in sorted(best_by_vehicle_count.items()):
+        print(
+            f"精细排班 {vehicle_count} 辆：成本 {cost:.2f} 元，"
+            f"新能源 {electric_trips} 趟"
+        )
+    for electric_trips in (23, 24, 26, 28, 30, 32, 34, 36):
+        if electric_trips not in best_by_electric_trip_count:
+            continue
+        cost, vehicle_count = best_by_electric_trip_count[electric_trips]
+        print(
+            f"新能源 {electric_trips} 趟最优：成本 {cost:.2f} 元，"
+            f"物理车辆 {vehicle_count} 辆"
+        )
+    best_routes, best_result, _ = min(candidates, key=lambda item: item[1].total_cost)
+    return best_routes, best_result
 
 
 def _write_outputs(
@@ -187,7 +257,7 @@ def _write_outputs(
     totals = {
         "solution_variant": variant,
         "algorithm": (
-            "best of cost-aware Clarke-Wright and time-window greedy + route elimination "
+            "best of time-window-weighted cost-aware Clarke-Wright and time-window greedy + route elimination "
             "+ 2-opt + relocate + swap + route merge + global vehicle assignment "
             "+ departure-time optimization + multi-trip physical-vehicle scheduling"
         ),
@@ -230,9 +300,11 @@ def _write_outputs(
             problem.missing_value_policy,
             "客户总需求允许按重量与体积同比例拆分给多辆车",
             "同一物理车辆可在返回配送中心后执行多趟任务，启动成本每天只计一次",
+            "所有配送趟次必须在当日24:00前返回配送中心，不允许跨天配送",
             "车速使用题面正态分布的均值，并按跨时段分段行驶",
             "按清洗说明假设 17:00-19:00 为晚高峰 9.8 km/h，19:00 后为顺畅 55.3 km/h",
             "载荷能耗增幅按重量/容积利用率最大值线性插值",
+            "Clarke-Wright 排序同时比较距离节约值与客户时间窗中点差异",
         ],
     }
     (table_dir / f"question1_{variant}_totals.json").write_text(
@@ -251,16 +323,23 @@ def _choose_initial_routes(problem, evaluator: RouteEvaluator, method: str):
             ("greedy", greedy, greedy_solution)
         )
     if method in ("savings", "best"):
-        savings = build_savings_routes(problem)
-        savings, savings_solution = _best_multi_trip_schedule(savings, evaluator)
-        validate_solution(problem, savings)
-        candidates.append(
-            (
-                "savings",
-                savings,
-                savings_solution,
+        for time_penalty in (0.0, 5.0, 15.0, 30.0):
+            savings = build_savings_routes(
+                problem,
+                time_window_penalty_km_per_hour=time_penalty,
             )
-        )
+            try:
+                savings, savings_solution = _best_multi_trip_schedule(savings, evaluator)
+            except RuntimeError:
+                continue
+            validate_solution(problem, savings)
+            candidates.append(
+                (
+                    f"savings_time_{time_penalty:g}",
+                    savings,
+                    savings_solution,
+                )
+            )
     if not candidates:
         raise RuntimeError("没有得到满足车队数量约束的初始解")
     return min(candidates, key=lambda item: item[2].total_cost)
@@ -318,6 +397,8 @@ def run(
     if use_local_search:
         routes = eliminate_low_load_routes(routes, evaluator)
         record_stage("eliminate_low_load")
+        routes = repack_split_low_load_route(routes, evaluator)
+        record_stage("split_repack_low_load")
         routes = improve_routes_two_opt(routes, evaluator)
         record_stage("two_opt_1")
         routes = improve_routes_relocate(routes, evaluator)
@@ -336,9 +417,13 @@ def run(
 
     routes = best_routes
     solution = best_solution
+    refined_routes, refined_solution = _intensive_multi_trip_schedule(routes, evaluator)
+    if refined_solution.total_cost < solution.total_cost - 1e-7:
+        routes = refined_routes
+        solution = refined_solution
     optimization_trace.append(
         {
-            "stage": "best_solution_restored",
+            "stage": "intensive_38_42_schedule",
             "vehicles": solution.vehicle_count,
             "trips": solution.trip_count,
             "distance_km": solution.total_distance_km,

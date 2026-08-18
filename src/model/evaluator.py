@@ -234,18 +234,27 @@ class RouteEvaluator:
         route: Route,
         earliest: float = 480.0,
         step_minutes: float = 10.0,
+        latest_finish: float | None = None,
     ) -> RouteEvaluation:
         if not route.deliveries:
-            return self.evaluate(route, earliest)
+            result = self.evaluate(route, earliest)
+            if latest_finish is not None and result.finish_minutes > latest_finish + 1e-9:
+                raise ValueError("路线无法在当日截止时间前完成")
+            return result
         latest_window = max(self.problem.windows[item.customer_id][1] for item in route.deliveries)
         latest_start = max(earliest, min(latest_window, 20.0 * 60.0))
-        best = self.evaluate(route, earliest)
-        candidate = earliest + step_minutes
+        best: RouteEvaluation | None = None
+        candidate = earliest
         while candidate <= latest_start + 1e-9:
             result = self.evaluate(route, candidate)
-            if result.total_cost < best.total_cost - 1e-9:
+            if latest_finish is not None and result.finish_minutes > latest_finish + 1e-9:
+                candidate += step_minutes
+                continue
+            if best is None or result.total_cost < best.total_cost - 1e-9:
                 best = result
             candidate += step_minutes
+        if best is None:
+            raise ValueError("路线无法在当日截止时间前完成")
         route.start_minutes = best.start_minutes
         return best
 

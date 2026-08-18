@@ -12,6 +12,7 @@ from src.solver.local_search import (
     eliminate_low_load_routes,
     improve_routes_merge,
     improve_routes_relocate,
+    repack_split_low_load_route,
 )
 from src.solver.savings import build_savings_routes
 from src.solver.scheduling import (
@@ -239,6 +240,98 @@ class BaselineTests(unittest.TestCase):
         routes = build_savings_routes(problem, (vehicle,))
         self.assertEqual(len(routes), 2)
         self.assertTrue(all(route.total_weight == 3000.0 for route in routes))
+
+    def test_multitrip_schedule_rejects_cross_day_delivery(self) -> None:
+        problem = ProblemData(
+            distance=np.array([[0.0, 100.0], [100.0, 0.0]]),
+            demands={1: (80.0, 1.0)},
+            windows={1: (480.0, 1200.0)},
+            coordinates={0: (0.0, 0.0), 1: (1.0, 0.0)},
+            all_customer_ids=(1,),
+        )
+        vehicle = VehicleType("EV", "electric", 100.0, 5.0, 1)
+        route = Route(vehicle, 1, [Delivery(1, 80.0, 1.0)])
+        evaluator = RouteEvaluator(problem)
+        with self.assertRaises(ValueError):
+            evaluator.best_departure(
+                route,
+                earliest=23.0 * 60.0,
+                latest_finish=24.0 * 60.0,
+            )
+
+    def test_split_repack_can_remove_low_load_trip(self) -> None:
+        problem = ProblemData(
+            distance=np.array(
+                [
+                    [0.0, 5.0, 5.0, 5.0],
+                    [5.0, 0.0, 1.0, 1.0],
+                    [5.0, 1.0, 0.0, 1.0],
+                    [5.0, 1.0, 1.0, 0.0],
+                ]
+            ),
+            demands={1: (40.0, 0.4), 2: (80.0, 0.8), 3: (80.0, 0.8)},
+            windows={
+                1: (480.0, 1200.0),
+                2: (480.0, 1200.0),
+                3: (480.0, 1200.0),
+            },
+            coordinates={
+                0: (0.0, 0.0),
+                1: (1.0, 0.0),
+                2: (2.0, 0.0),
+                3: (3.0, 0.0),
+            },
+            all_customer_ids=(1, 2, 3),
+        )
+        vehicle = VehicleType("EV", "electric", 100.0, 5.0, 3)
+        routes = [
+            Route(vehicle, 1, [Delivery(1, 40.0, 0.4)]),
+            Route(vehicle, 2, [Delivery(2, 80.0, 0.8)]),
+            Route(vehicle, 3, [Delivery(3, 80.0, 0.8)]),
+        ]
+        repacked = repack_split_low_load_route(routes, RouteEvaluator(problem))
+        self.assertEqual(len(repacked), 2)
+        delivered = sum(item.weight for route in repacked for item in route.deliveries)
+        self.assertAlmostEqual(delivered, 200.0)
+        self.assertTrue(all(route.total_weight <= 100.0 + 1e-7 for route in repacked))
+
+    def test_multitrip_can_enforce_exact_electric_trip_count(self) -> None:
+        problem = ProblemData(
+            distance=np.array(
+                [
+                    [0.0, 2.0, 2.0, 2.0],
+                    [2.0, 0.0, 1.0, 1.0],
+                    [2.0, 1.0, 0.0, 1.0],
+                    [2.0, 1.0, 1.0, 0.0],
+                ]
+            ),
+            demands={1: (40.0, 1.0), 2: (40.0, 1.0), 3: (40.0, 1.0)},
+            windows={
+                1: (480.0, 1200.0),
+                2: (480.0, 1200.0),
+                3: (480.0, 1200.0),
+            },
+            coordinates={0: (0.0, 0.0), 1: (1.0, 0.0), 2: (2.0, 0.0), 3: (3.0, 0.0)},
+            all_customer_ids=(1, 2, 3),
+        )
+        electric = VehicleType("EV", "electric", 100.0, 5.0, 1)
+        fuel = VehicleType("FUEL", "fuel", 100.0, 5.0, 3)
+        placeholder = VehicleType("TEMP", "fuel", 100.0, 5.0, 99)
+        routes = [
+            Route(placeholder, 0, [Delivery(customer, 40.0, 1.0)])
+            for customer in (1, 2, 3)
+        ]
+        scheduled = select_and_schedule_multitrip(
+            routes,
+            RouteEvaluator(problem),
+            (electric, fuel),
+            electric_trip_minimum=2,
+            electric_trip_limit=2,
+        )
+        self.assertEqual(
+            sum(route.vehicle_type.propulsion == "electric" for route in scheduled),
+            2,
+        )
 
 
 if __name__ == "__main__":

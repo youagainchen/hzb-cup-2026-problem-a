@@ -4,54 +4,55 @@
   "data_source": "D:\\Tencent Files\\A题\\data\\processed\\team_cleaned",
   "active_customers": 88,
   "no_order_customers": 10,
-  "delivery_trips": 99,
+  "delivery_trips": 98,
   "physical_vehicles": 49,
   "trip_count_capacity_lower_bound": 96,
   "trip_usage_by_type": {
-    "EV-3000": 26,
-    "FUEL-3000": 73
+    "EV-3000": 21,
+    "FUEL-3000": 77
   },
   "physical_vehicle_usage": {
-    "EV-3000": 10,
-    "FUEL-3000": 39
+    "FUEL-3000": 39,
+    "EV-3000": 10
   },
   "imputed_weight_rows": 14,
   "imputed_volume_rows": 16,
-  "total_distance_km": 11459.62230882674,
-  "fuel_liters": 2186.356338850982,
-  "electricity_kwh": 1731.8441543490835,
-  "total_emissions_kg": 6436.303516382342,
+  "total_distance_km": 11490.977909150883,
+  "fuel_liters": 2364.920107140134,
+  "electricity_kwh": 1513.3344950163305,
+  "total_emissions_kg": 6781.632094889103,
   "fixed_cost": 19600.0,
-  "energy_cost": 19478.39615178847,
-  "carbon_cost": 4183.597285648522,
-  "waiting_cost": 518.1977963961257,
-  "late_cost": 2925.6434966080087,
-  "total_cost": 46705.83473044113,
+  "energy_cost": 20478.910587163202,
+  "carbon_cost": 4408.060861677917,
+  "waiting_cost": 195.2801643759392,
+  "late_cost": 3583.9492001720428,
+  "total_cost": 48266.2008133891,
   "cost_share": {
-    "fixed": 0.4196477830472313,
-    "energy": 0.41704417155172213,
-    "carbon": 0.08957333296351107,
-    "waiting": 0.011094926348856872,
-    "late": 0.06263978608867861
+    "fixed": 0.40608126742312267,
+    "energy": 0.4242909166673489,
+    "carbon": 0.09132810926471586,
+    "waiting": 0.004045898808794751,
+    "late": 0.07425380783601786
   },
   "optimization_trace": [
     {
       "stage": "balanced_49",
       "vehicles": 49,
-      "trips": 99,
-      "distance_km": 11459.62230882674,
+      "trips": 98,
+      "distance_km": 11490.977909150883,
       "fixed_cost": 19600.0,
-      "energy_cost": 19478.39615178847,
-      "carbon_cost": 4183.597285648522,
-      "waiting_cost": 518.1977963961257,
-      "late_cost": 2925.6434966080087,
-      "total_cost": 46705.83473044113
+      "energy_cost": 20478.910587163202,
+      "carbon_cost": 4408.060861677917,
+      "waiting_cost": 195.2801643759392,
+      "late_cost": 3583.9492001720428,
+      "total_cost": 48266.2008133891
     }
   ],
   "assumptions": [
     "队友清洗数据：同客户均值填补",
     "客户总需求允许按重量与体积同比例拆分给多辆车",
     "同一物理车辆可在返回配送中心后执行多趟任务，启动成本每天只计一次",
+    "所有配送趟次必须在当日24:00前返回配送中心，不允许跨天配送",
     "车速使用题面正态分布的均值，并按跨时段分段行驶",
     "按清洗说明假设 17:00-19:00 为晚高峰 9.8 km/h，19:00 后为顺畅 55.3 km/h",
     "载荷能耗增幅按重量/容积利用率最大值线性插值"
