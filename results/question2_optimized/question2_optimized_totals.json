@@ -1,0 +1,104 @@
+{
+  "solution_variant": "question2_q1_policy_repair_optimized",
+  "algorithm": "Q1路线继承 + 绿色节点顺序修复 + 10分钟发车时刻枚举 + 异构车型选择 + 多趟物理车辆复用 + 固定种子参数搜索",
+  "selected_parameters": {
+    "seed": 202603,
+    "order_rule": "green_first",
+    "startup_cost_weight": 99.0,
+    "departure_step_minutes": 10
+  },
+  "data_source": "D:\\Tencent Files\\A题\\.codex_q2_run\\data\\processed\\team_cleaned",
+  "active_customers": 88,
+  "green_customers": 15,
+  "green_active_customers": 12,
+  "delivery_trips": 98,
+  "physical_vehicles": 35,
+  "trip_usage_by_type": {
+    "EV-3000": 33,
+    "FUEL-3000": 65
+  },
+  "physical_vehicle_usage": {
+    "EV-3000": 10,
+    "FUEL-3000": 25
+  },
+  "propulsion_trip_count": {
+    "electric": 33,
+    "fuel": 65
+  },
+  "total_distance_km": 11490.977909150883,
+  "fuel_liters": 2278.931538196069,
+  "electricity_kwh": 1600.8568599908317,
+  "emissions_kg": 6606.467914640795,
+  "fixed_cost": 14000.0,
+  "energy_cost": 19968.07425605705,
+  "carbon_cost": 4294.204144516517,
+  "waiting_cost": 116.84125591796776,
+  "late_cost": 7513.852796596459,
+  "total_cost": 45892.97245308799,
+  "feasibility": {
+    "policy_violation_count": 0,
+    "unfinished_customer_count": 0,
+    "unfinished_weight_kg": 4.661160346586257e-12,
+    "unfinished_volume_m3": 3.0000000031948915e-06,
+    "capacity_violation_count": 0,
+    "all_routes_return_before_24h": true,
+    "late_stop_count": 75
+  },
+  "assumptions": [
+    "绿色区客户集合读取清洗坐标表的是否绿色配送区字段",
+    "燃油车到达绿色客户节点的时刻采用[08:00,16:00)判定",
+    "新能源车不受绿色区限行影响",
+    "同一物理车辆返场后可继续执行下一趟，启动成本每天计一次",
+    "所有配送趟次必须在24:00前返回配送中心"
+  ],
+  "policy_impact": {
+    "total_cost": {
+      "absolute_change": 2495.70963,
+      "percent_change": 5.750846
+    },
+    "physical_vehicles": {
+      "absolute_change": -3.0,
+      "percent_change": -7.894737
+    },
+    "delivery_trips": {
+      "absolute_change": 0.0,
+      "percent_change": 0.0
+    },
+    "total_distance_km": {
+      "absolute_change": 0.0,
+      "percent_change": 0.0
+    },
+    "emissions_kg": {
+      "absolute_change": -29.522562,
+      "percent_change": -0.444886
+    },
+    "fuel_liters": {
+      "absolute_change": -12.536193,
+      "percent_change": -0.547081
+    },
+    "electricity_kwh": {
+      "absolute_change": 4.804635,
+      "percent_change": 0.301032
+    },
+    "fixed_cost": {
+      "absolute_change": -1200.0,
+      "percent_change": -7.894737
+    },
+    "energy_cost": {
+      "absolute_change": -87.520829,
+      "percent_change": -0.436391
+    },
+    "carbon_cost": {
+      "absolute_change": -19.189665,
+      "percent_change": -0.444886
+    },
+    "waiting_cost": {
+      "absolute_change": -78.608092,
+      "percent_change": -40.219163
+    },
+    "late_cost": {
+      "absolute_change": 3881.028216,
+      "percent_change": 106.832249
+    }
+  }
+}

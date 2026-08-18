@@ -1,0 +1,3 @@
+﻿vehicle_type,propulsion,q1_physical_vehicles,q2_physical_vehicles,physical_vehicle_change,q1_trips,q2_trips,trip_change
+EV-3000,electric,10,10,0,24,33,9
+FUEL-3000,fuel,28,25,-3,74,65,-9

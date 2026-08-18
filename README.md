@@ -66,12 +66,17 @@ python -m src.main
 
 1号模块在 `src/solver/q2_search.py` 中实现车型重选、发车修复、整趟交换、整趟迁移、车辆数压缩和ALNS，通过 `src/q2_adapter.py` 只读调用2号评估器，并输出路线、收敛日志和5种子统计。
 
+在2号交接完成后，1号又增加了 `src/solver/q2_scheduling.py` 与 `tools/run_q2_optimized.py`：直接继承问题一的98趟配送任务，联合搜索绿色节点访问顺序、合规发车时刻、车型和物理车辆多趟复用。正式结果写入 `results/question2_optimized/`，同时给出问题一/问题二的成本、车辆结构和碳排放对比。
+
 ```powershell
 # 只重建2号实例与确定性基线
 run_question2.cmd --baseline-only
 
 # 接入2号实例与评估器，运行1号5种子ALNS
 run_question2.cmd
+
+# 基于问题一正式方案进行限行重排，并生成问题二正式对比结果
+run_question2.cmd --optimized
 ```
 
 ## 协作约定

@@ -35,10 +35,16 @@ exit /b 1
 :run_model
 echo Using Python: %TASK_PYTHON%
 if /I "%~1"=="--baseline-only" goto run_baseline
+if /I "%~1"=="--optimized" goto run_optimized
 "%TASK_PYTHON%" -m src.question2_cli --adapter src.q2_adapter:build_context %*
 exit /b %ERRORLEVEL%
 
 :run_baseline
 shift
 "%TASK_PYTHON%" tools\build_q2_startup.py --data-dir data\processed\team_cleaned --output-dir results\question2_startup %*
+exit /b %ERRORLEVEL%
+
+:run_optimized
+shift
+"%TASK_PYTHON%" tools\run_q2_optimized.py --data-dir data\processed\team_cleaned --output-dir results\question2_optimized %*
 exit /b %ERRORLEVEL%
