@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import perf_counter
 
 from src.model.domain import DEFAULT_VEHICLE_TYPES, Delivery, ProblemData, Route, VehicleType
@@ -201,6 +201,52 @@ def _apply_new_orders(
     return result
 
 
+def _force_new_vehicle_orders(
+    routes: list[Route],
+    event_set: Q3EventSet,
+    evaluator: RouteEvaluator,
+    trigger_time_minutes: float,
+) -> list[Route]:
+    """新增订单单独开新车：每个新增订单选择容量/政策可行且成本最低的车型。
+
+    当局部最优插入破坏了全局排程可行性时，用它作为回退策略。
+    """
+    result = clone_routes(routes)
+    for event in event_set.events:
+        if event.event_type != Q3EventType.NEW_ORDER:
+            continue
+        if event.weight_kg is None or event.volume_m3 is None:
+            raise ValueError("新增订单缺少重量或体积")
+        delivery = Delivery(event.customer_id, event.weight_kg, event.volume_m3)
+        candidates: list[tuple[tuple[float, float, str], Route]] = []
+        for vehicle in DEFAULT_VEHICLE_TYPES:
+            if delivery.weight > vehicle.capacity_weight + EPSILON:
+                continue
+            if delivery.volume > vehicle.capacity_volume + EPSILON:
+                continue
+            candidate = Route(
+                vehicle_type=vehicle,
+                vehicle_number=0,
+                deliveries=[delivery],
+                start_minutes=trigger_time_minutes,
+                trip_number=1,
+            )
+            scored = _route_cost(candidate, evaluator, trigger_time_minutes)
+            if scored is None:
+                continue
+            _, evaluation = scored
+            candidates.append(
+                (
+                    (float(evaluation.total_cost), float(evaluation.finish_minutes), vehicle.name),
+                    candidate,
+                )
+            )
+        if not candidates:
+            raise RuntimeError(f"新增订单客户 {event.customer_id} 无法单独开新车")
+        result.append(min(candidates, key=lambda item: item[0])[1])
+    return result
+
+
 def _schedule_future_routes(
     source_routes: list[Route],
     evaluator: RouteEvaluator,
@@ -351,6 +397,7 @@ def _schedule_future_routes(
             candidate, evaluation = scheduled_choice
             available = evaluation.finish_minutes
             preserved.append(candidate)
+        ready[key] = available
         if not preserve_ok:
             break
     if preserve_ok:
@@ -366,15 +413,19 @@ def _schedule_future_routes(
                         vehicle,
                         number,
                         max(trigger_time_minutes, ready[key]),
-                        1,
+                        trip_counter[key] + 1,
                     )
                     if choice is not None:
                         candidate, evaluation = choice
-                        choices.append((evaluation.total_cost, candidate, evaluation))
+                        choices.append((evaluation.total_cost, candidate, evaluation, key))
             if not choices:
                 preserve_ok = False
                 break
-            _, candidate, evaluation = min(choices, key=lambda item: (item[0], item[1].route_id))
+            _, candidate, evaluation, key = min(
+                choices, key=lambda item: (item[0], item[1].route_id)
+            )
+            ready[key] = evaluation.finish_minutes
+            trip_counter[key] += 1
             preserved.append(candidate)
         if preserve_ok and len(preserved) == len(source_routes):
             return preserved
@@ -480,7 +531,6 @@ def dispatch_event_set(
         if route.route_id not in frozen_ids
     ]
     future_source = _remove_cancelled_routes(future_source, event_set)
-    future_source = _apply_new_orders(future_source, event_set, evaluator_after)
     affected = {
         event.customer_id
         for event in event_set.events
@@ -489,23 +539,46 @@ def dispatch_event_set(
             Q3EventType.TIME_WINDOW_CHANGE,
         }
     }
-    future_source = _local_reorder(future_source, evaluator_after, affected)
-    future_routes = _schedule_future_routes(
-        future_source,
-        evaluator_after,
-        freeze_state,
-        event_set.trigger_time_minutes,
-    )
+    trigger = event_set.trigger_time_minutes
+
+    # 新增订单双策略：优先插入已有趟次；若导致全局不可行，则单独开新车。
+    # 两种策略都经统一评估器验收，取满足全部硬约束且总成本最低的可行方案。
+    strategies = [
+        ("insert_existing", lambda src: _apply_new_orders(src, event_set, evaluator_after)),
+        (
+            "open_vehicle",
+            lambda src: _force_new_vehicle_orders(src, event_set, evaluator_after, trigger),
+        ),
+    ]
+    best_step: tuple[list[Route], DynamicEvaluation] | None = None
+    for _, strategy in strategies:
+        candidate_source = _local_reorder(
+            strategy(clone_routes(future_source)), evaluator_after, affected
+        )
+        try:
+            candidate_routes = _schedule_future_routes(
+                candidate_source, evaluator_after, freeze_state, trigger
+            )
+        except RuntimeError:
+            continue
+        evaluation = evaluate_dynamic(
+            candidate_routes,
+            freeze_state,
+            evaluator_after,
+            static_total_cost=float(static_total_cost),
+            static_routes=static_routes,
+            optimize_departures=False,
+            response_time_s=None,
+        )
+        if not evaluation.feasibility.passed:
+            continue
+        if best_step is None or evaluation.total_cost < best_step[1].total_cost - 1e-9:
+            best_step = (candidate_routes, evaluation)
+    if best_step is None:
+        raise RuntimeError("所有新增订单处理策略均无法生成可行的动态方案")
+    future_routes, evaluation = best_step
     response_time_s = perf_counter() - start_clock
-    evaluation = evaluate_dynamic(
-        future_routes,
-        freeze_state,
-        evaluator_after,
-        static_total_cost=float(static_total_cost),
-        static_routes=static_routes,
-        optimize_departures=False,
-        response_time_s=response_time_s,
-    )
+    evaluation = replace(evaluation, response_time_s=response_time_s)
     return DynamicStep(
         event_set=event_set,
         problem_after=problem_after,

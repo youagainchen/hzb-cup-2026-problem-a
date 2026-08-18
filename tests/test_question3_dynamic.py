@@ -7,7 +7,7 @@ from pathlib import Path
 from src.data.loader import load_problem_data
 from src.model.evaluator import RouteEvaluator, evaluate_solution
 from src.model.policy_q2 import build_q2_policy
-from src.model.q3_event import Q3EventType, apply_events
+from src.model.q3_event import Q3EventSet, Q3EventType, apply_events
 from src.solver.q2_initial import load_route_solution
 from src.solver.q3_dynamic import dispatch_event_set
 from tools.run_q3_optimized import read_event_sets
@@ -125,6 +125,39 @@ class Question3DynamicTests(unittest.TestCase):
             feasibility = step.evaluation.feasibility
             self.assertTrue(feasibility.passed, scenario.description)
             self.assertEqual(feasibility.policy_violation_count, 0)
+            self.assertEqual(feasibility.schedule_violation_count, 0)
+            self.assertEqual(feasibility.demand_unfinished_customers, 0)
+
+    def test_each_single_event_and_combined_are_feasible(self) -> None:
+        """回归：单事件与组合事件都必须能生成可行方案（防插入破坏全局排程崩溃）。"""
+        evaluator = RouteEvaluator(
+            self.problem,
+            policy=build_q2_policy(self.problem.green_customer_ids),
+        )
+        static_total = evaluate_solution(
+            self.routes, evaluator, optimize_departures=False
+        ).total_cost
+        scenarios = [
+            Q3EventSet(
+                trigger_time_minutes=event.trigger_time_minutes,
+                events=(event,),
+                description=f"single_{event.event_type.value}",
+            )
+            for event in self.event_set.events
+        ]
+        scenarios.append(self.event_set)
+        for scenario in scenarios:
+            step = dispatch_event_set(
+                self.routes,
+                self.problem,
+                scenario,
+                static_total_cost=static_total,
+            )
+            feasibility = step.evaluation.feasibility
+            self.assertTrue(
+                feasibility.passed,
+                f"{scenario.description}: {feasibility.notes}",
+            )
             self.assertEqual(feasibility.schedule_violation_count, 0)
             self.assertEqual(feasibility.demand_unfinished_customers, 0)
 
