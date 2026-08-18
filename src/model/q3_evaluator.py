@@ -140,7 +140,9 @@ class DynamicEvaluation:
     total_cost: float
     static_total_cost: float
     delta_cost: float
+    delta_cost_base: float
     cost_change_ratio: float
+    cost_change_ratio_base: float
     lead_time_minutes: float | None
     sunk_vehicle_count: int
     future_vehicle_count: int
@@ -228,7 +230,7 @@ def _edge_set(routes, replannable_ids) -> set[tuple[int, int]]:
             continue
         nodes = [0, *(item.customer_id for item in route.deliveries), 0]
         for left, right in zip(nodes, nodes[1:]):
-            edges.add((left, right))
+            edges.add((route.route_id, left, right))
     return edges
 
 
@@ -240,8 +242,9 @@ def count_disturbance(
     """按停靠结构比较可重排趟次与客户，返回扰动指标。
 
     - kept/dropped/new：趟次级别，按停靠签名匹配；被重构的趟次计 1 删 1 增。
-    - changed_customer_count / assignment_change_ratio：客户服务趟次签名集合变化。
-    - arc_change_ratio：有向边集合对称差度量，完全不变为 0。
+    - changed_customer_count / assignment_change_ratio：只统计事件前后共同存在
+      的原有客户 U_common = U_before ∩ U_after；取消/新增订单本身不视为扰动。
+    - arc_change_ratio：带趟次标签的有向边 (route_id, i, j) 集合对称差度量。
     """
     replannable_ids = set(freeze_state.replannable_trip_ids)
     static_sigs = Counter(
@@ -254,18 +257,25 @@ def count_disturbance(
     dropped = sum((static_sigs - future_sigs).values())
     new_trips = sum((future_sigs - static_sigs).values())
 
-    remaining_customers = set(freeze_state.remaining_demand)
+    u_before = {
+        item.customer_id
+        for route in static_routes
+        if route.route_id in replannable_ids
+        for item in route.deliveries
+    }
+    u_after = set(freeze_state.remaining_demand)
+    common_customers = u_before & u_after
     future_ids = {route.route_id for route in future_routes}
     static_serving = _serving_signature_map(
-        static_routes, replannable_ids, remaining_customers
+        static_routes, replannable_ids, common_customers
     )
-    future_serving = _serving_signature_map(future_routes, future_ids, remaining_customers)
+    future_serving = _serving_signature_map(future_routes, future_ids, common_customers)
     changed_customers = sum(
-        1 for customer_id in remaining_customers
+        1 for customer_id in common_customers
         if static_serving[customer_id] != future_serving[customer_id]
     )
     assignment_change_ratio = (
-        changed_customers / len(remaining_customers) if remaining_customers else 0.0
+        changed_customers / len(common_customers) if common_customers else 0.0
     )
 
     static_edges = _edge_set(static_routes, replannable_ids)
@@ -293,9 +303,13 @@ def evaluate_dynamic(
     static_routes: list[Route],
     optimize_departures: bool = False,
     response_time_s: float | None = None,
+    base_total_cost: float | None = None,
 ) -> DynamicEvaluation:
     """对候选未来计划统一评分并返回动态口径的完整账目与可行性。
 
+    - `static_total_cost` 为上一批次总成本 C_{k-1}，`delta_cost` 即事件边际增量 ΔC_step；
+    - `base_total_cost` 为问题二静态基准 C₀（未传则与 static_total_cost 相同），
+      `delta_cost_base` 为相对问题二基准的累计增量 ΔC_base。
     未来计划必须覆盖 freeze_state.remaining_demand，且每辆车的趟次不得早于
     其就绪时刻、不得重叠；这些约束由本评估器校验并返回可行性标志。
     """
@@ -339,6 +353,9 @@ def evaluate_dynamic(
 
     disturbance = count_disturbance(static_routes, future_routes, freeze_state)
     delta_cost = total_cost - static_total_cost
+    if base_total_cost is None:
+        base_total_cost = static_total_cost
+    delta_cost_base = total_cost - base_total_cost
     lead_time_minutes = (
         min(route.start_minutes for route in future_routes) - freeze_state.trigger_time_minutes
         if future_routes
@@ -354,7 +371,9 @@ def evaluate_dynamic(
         total_cost=total_cost,
         static_total_cost=static_total_cost,
         delta_cost=delta_cost,
+        delta_cost_base=delta_cost_base,
         cost_change_ratio=delta_cost / static_total_cost if static_total_cost else 0.0,
+        cost_change_ratio_base=delta_cost_base / base_total_cost if base_total_cost else 0.0,
         lead_time_minutes=lead_time_minutes,
         sunk_vehicle_count=len(freeze_state.sunk_vehicle_keys),
         future_vehicle_count=len(future_vehicle_keys),

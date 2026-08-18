@@ -24,7 +24,7 @@ def build_severity_scenarios() -> tuple[Q3EventSet, ...]:
 
     configurations = {
         "low": {
-            "cancel_customer": 13,
+            "cancel_customer": 12,  # 受控变量：所有档位取消同一客户，隔离其余维度影响
             "new_weight": 300.0,
             "new_volume": 0.9,
             "new_coordinate": (4.0, 5.0),
@@ -37,7 +37,7 @@ def build_severity_scenarios() -> tuple[Q3EventSet, ...]:
             "new_volume": 1.8,
             "new_coordinate": (5.0, 6.0),
             "address_coordinate": (20.0, -20.0),
-            "window_shift": 30.0,
+            "window_shift": 30.0,  # 与官方主场景一致
         },
         "high": {
             "cancel_customer": 12,
@@ -105,7 +105,9 @@ def _row(severity: str, step: DynamicStep) -> dict[str, object]:
         "trigger_clock": "10:00",
         "dynamic_total_cost": evaluation.total_cost,
         "delta_cost": evaluation.delta_cost,
+        "delta_cost_base": evaluation.delta_cost_base,
         "cost_change_ratio": evaluation.cost_change_ratio,
+        "cost_change_ratio_base": evaluation.cost_change_ratio_base,
         "response_time_s": step.response_time_s,
         "lead_time_minutes": evaluation.lead_time_minutes,
         "changed_customer_count": evaluation.changed_customer_count,
@@ -193,9 +195,9 @@ def run(
             {
                 "static_total_cost": static_total,
                 "scenario_design": {
-                    "low": "取消c13；新增300kg/0.9m³；c82变址至(16,-16)；c70改窗+15min",
-                    "medium": "取消c12；新增600kg/1.8m³；c82变址至(20,-20)；c70改窗+30min",
-                    "high": "取消c12；新增1000kg/3.0m³；c82变址至(23,-23)；c70改窗+45min",
+                    "low": "取消c12(受控)；新增300kg/0.9m³；c82变址至(16,-16)；c70改窗+15min",
+                    "medium": "取消c12(受控)；新增600kg/1.8m³；c82变址至(20,-20)；c70改窗+30min（与官方主场景一致）",
+                    "high": "取消c12(受控)；新增1000kg/3.0m³；c82变址至(23,-23)；c70改窗+45min",
                 },
                 "results": rows,
             },

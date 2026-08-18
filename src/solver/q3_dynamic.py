@@ -127,6 +127,7 @@ def _insert_one_delivery(
     delivery: Delivery,
     evaluator: RouteEvaluator,
     trigger_time_minutes: float,
+    freeze_state: FreezeState | None = None,
 ) -> list[Route]:
     best: tuple[tuple[float, float, int, int], int, Route] | None = None
     for route_index, route in enumerate(routes):
@@ -157,7 +158,8 @@ def _insert_one_delivery(
         result[route_index] = candidate
         return result
 
-    # If no existing route can absorb the order, open the cheapest feasible vehicle type.
+    # 已有趟次无法吸收时，启用 Q2 未使用车辆（新增一次 400 元启动成本）。
+    # "已启用车辆空闲时段新增趟次"作为独立策略在 dispatch_event_set 中尝试。
     candidates: list[tuple[tuple[float, float, str], Route]] = []
     for vehicle in DEFAULT_VEHICLE_TYPES:
         if delivery.weight > vehicle.capacity_weight + EPSILON:
@@ -181,10 +183,108 @@ def _insert_one_delivery(
     return routes + [min(candidates, key=lambda item: item[0])[1]]
 
 
+def _rebuild_chain(
+    routes: list[Route],
+    chain: list[Route],
+    new_trip: Route,
+) -> list[Route]:
+    """把新趟并入该物理车辆的趟次序列并重新编号，返回完整路线列表。"""
+    chain_ids = {id(route) for route in chain}
+    new_chain = sorted(
+        [clone_route(route) for route in chain] + [new_trip],
+        key=lambda route: route.start_minutes,
+    )
+    for index, route in enumerate(new_chain, start=1):
+        route.trip_number = index
+    return [route for route in routes if id(route) not in chain_ids] + new_chain
+
+
+def _new_trip_on_enabled_vehicle(
+    routes: list[Route],
+    delivery: Delivery,
+    evaluator: RouteEvaluator,
+    freeze_state: FreezeState,
+    trigger_time_minutes: float,
+) -> list[Route] | None:
+    """在已启用物理车辆的空闲时段为新增订单新建一趟。
+
+    要求干净容纳（新趟返场不晚于下一趟发车），不调整其他趟次；返回新建后
+    运行成本最低的完整路线列表，无可容纳时段返回 None。
+    """
+    by_vehicle: dict[tuple[str, int], list[Route]] = defaultdict(list)
+    for route in routes:
+        if route.vehicle_number > 0:
+            by_vehicle[(route.vehicle_type.name, route.vehicle_number)].append(route)
+    vehicles_by_name = {vehicle.name: vehicle for vehicle in DEFAULT_VEHICLE_TYPES}
+
+    best: tuple[float, list[Route]] | None = None
+    for key, chain in by_vehicle.items():
+        vehicle = vehicles_by_name[key[0]]
+        if delivery.weight > vehicle.capacity_weight + EPSILON:
+            continue
+        if delivery.volume > vehicle.capacity_volume + EPSILON:
+            continue
+        evaluated = [
+            (evaluator.evaluate(route, route.start_minutes), route) for route in chain
+        ]
+        evaluated.sort(key=lambda item: item[0].start_minutes)
+        ready = freeze_state.vehicle_ready_minutes.get(key, trigger_time_minutes)
+        cursor = max(trigger_time_minutes, ready)
+        gaps: list[tuple[float, float]] = []
+        for result, _route in evaluated:
+            gaps.append((cursor, result.start_minutes))
+            cursor = result.finish_minutes
+        gaps.append((cursor, DAY_END_MINUTES))
+
+        for gap_start, gap_end in gaps:
+            if gap_start > DAY_END_MINUTES + EPSILON or gap_end - gap_start < EPSILON:
+                continue
+            new_trip = Route(vehicle, key[1], [delivery], gap_start, 0)
+            scored = _route_cost(new_trip, evaluator, gap_start)
+            if scored is None:
+                continue
+            _, result = scored
+            if result.finish_minutes > gap_end + EPSILON:
+                continue
+            new_plan = _rebuild_chain(routes, chain, new_trip)
+            operating = result.total_cost - result.fixed_cost
+            if best is None or operating < best[0]:
+                best = (operating, new_plan)
+    return best[1] if best is not None else None
+
+
+def _enabled_vehicle_new_trips(
+    routes: list[Route],
+    event_set: Q3EventSet,
+    evaluator: RouteEvaluator,
+    freeze_state: FreezeState,
+    trigger_time_minutes: float,
+) -> list[Route] | None:
+    """为新增订单在已启用物理车辆空闲时段新增趟次（独立策略）。"""
+    result = clone_routes(routes)
+    for event in event_set.events:
+        if event.event_type != Q3EventType.NEW_ORDER:
+            continue
+        if event.weight_kg is None or event.volume_m3 is None:
+            raise ValueError("新增订单缺少重量或体积")
+        plan = _new_trip_on_enabled_vehicle(
+            result,
+            Delivery(event.customer_id, event.weight_kg, event.volume_m3),
+            evaluator,
+            freeze_state,
+            trigger_time_minutes,
+        )
+        if plan is None:
+            return None
+        result = plan
+    return result
+
+
 def _apply_new_orders(
     routes: list[Route],
     event_set: Q3EventSet,
     evaluator: RouteEvaluator,
+    freeze_state: FreezeState | None = None,
 ) -> list[Route]:
     result = clone_routes(routes)
     for event in event_set.events:
@@ -197,6 +297,7 @@ def _apply_new_orders(
             Delivery(event.customer_id, event.weight_kg, event.volume_m3),
             evaluator,
             event.trigger_time_minutes,
+            freeze_state,
         )
     return result
 
@@ -472,7 +573,12 @@ def _schedule_future_routes(
                 if scheduled_choice is None:
                     continue
                 candidate, best_result = scheduled_choice
-                new_vehicle_penalty = 400.0 if key not in used_future_keys else 0.0
+                # 已沉没（已付 400）或未来计划已用车辆不再计启动罚项；
+                # 只有真正需要新启用的物理车辆才加 400 罚项。
+                already_paid = (
+                    key in freeze_state.sunk_vehicle_keys or key in used_future_keys
+                )
+                new_vehicle_penalty = 0.0 if already_paid else 400.0
                 type_change_penalty = 25.0 if vehicle.name != source.vehicle_type.name else 0.0
                 key_preference_penalty = 5.0 if key != preferred_key else 0.0
                 score = (
@@ -502,6 +608,7 @@ def dispatch_event_set(
     problem: ProblemData,
     event_set: Q3EventSet,
     static_total_cost: float | None = None,
+    base_total_cost: float | None = None,
 ) -> DynamicStep:
     """执行一次滚动重优化：冻结已发车趟次，只重排未来趟次。"""
 
@@ -511,6 +618,8 @@ def dispatch_event_set(
         static_total_cost = evaluate_solution(
             static_routes, evaluator, optimize_departures=False
         ).total_cost
+    if base_total_cost is None:
+        base_total_cost = static_total_cost
 
     start_clock = perf_counter()
     problem_after, _ = apply_events(problem, event_set)
@@ -541,10 +650,20 @@ def dispatch_event_set(
     }
     trigger = event_set.trigger_time_minutes
 
-    # 新增订单双策略：优先插入已有趟次；若导致全局不可行，则单独开新车。
-    # 两种策略都经统一评估器验收，取满足全部硬约束且总成本最低的可行方案。
+    # 新增订单四级策略：①插入已有趟次 ②已启用车辆空闲时段新增趟次
+    # ③启用 Q2 未使用车辆。每种策略经统一评估器验收，取满足全部硬约束且
+    # 总成本最低的可行方案。
     strategies = [
-        ("insert_existing", lambda src: _apply_new_orders(src, event_set, evaluator_after)),
+        (
+            "insert_existing",
+            lambda src: _apply_new_orders(src, event_set, evaluator_after, freeze_state),
+        ),
+        (
+            "enabled_vehicle",
+            lambda src: _enabled_vehicle_new_trips(
+                src, event_set, evaluator_after, freeze_state, trigger
+            ),
+        ),
         (
             "open_vehicle",
             lambda src: _force_new_vehicle_orders(src, event_set, evaluator_after, trigger),
@@ -552,8 +671,14 @@ def dispatch_event_set(
     ]
     best_step: tuple[list[Route], DynamicEvaluation] | None = None
     for _, strategy in strategies:
+        try:
+            candidate_source = strategy(clone_routes(future_source))
+        except RuntimeError:
+            continue
+        if candidate_source is None:
+            continue
         candidate_source = _local_reorder(
-            strategy(clone_routes(future_source)), evaluator_after, affected
+            candidate_source, evaluator_after, affected
         )
         try:
             candidate_routes = _schedule_future_routes(
@@ -569,6 +694,7 @@ def dispatch_event_set(
             static_routes=static_routes,
             optimize_departures=False,
             response_time_s=None,
+            base_total_cost=float(base_total_cost),
         )
         if not evaluation.feasibility.passed:
             continue
@@ -594,15 +720,28 @@ def run_event_sequence(
     problem: ProblemData,
     event_sets: list[Q3EventSet],
     static_total_cost: float | None = None,
+    base_total_cost: float | None = None,
 ) -> tuple[DynamicStep, ...]:
-    """按触发时刻运行事件序列；同一时刻的事件应组成一个事件集。"""
+    """按触发时刻运行事件序列；同一时刻的事件应组成一个事件集。
 
+    `static_total_cost` 为上一批次总成本（计算 ΔC_step），`base_total_cost` 为
+    问题二静态基准 C₀（计算 ΔC_base），默认取 static_total_cost。
+    """
+
+    if base_total_cost is None:
+        base_total_cost = static_total_cost
     current_routes = clone_routes(static_routes)
     current_problem = problem
     current_total = static_total_cost
     steps: list[DynamicStep] = []
     for event_set in sorted(event_sets, key=lambda item: item.trigger_time_minutes):
-        step = dispatch_event_set(current_routes, current_problem, event_set, current_total)
+        step = dispatch_event_set(
+            current_routes,
+            current_problem,
+            event_set,
+            current_total,
+            base_total_cost=base_total_cost,
+        )
         steps.append(step)
         frozen = [
             clone_route(route)
