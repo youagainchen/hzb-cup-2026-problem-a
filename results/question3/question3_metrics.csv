@@ -1,0 +1,24 @@
+metric_id,group,metric_name,definition,unit,acceptance
+C_exec,成本,已执行成本(沉没),冻结趟次运行成本 + 400×已发车物理车辆数,元,—
+C_future_fixed,成本,未来固定成本,400×未来计划中未沉没物理车辆数,元,—
+C_future_oper,成本,未来运行成本,未来趟次能源+碳+等待+迟到成本之和,元,—
+C_future,成本,未来计划成本,C_future_fixed + C_future_oper,元,—
+C_total,成本,当日总成本,C_exec + C_future,元,—
+delta_cost,成本,成本增量 ΔC,C_total − Q2静态计划总成本,元,—
+cost_change_ratio,成本,成本相对变化率 R^C,ΔC / Q2静态计划总成本,%,—
+T_resp,响应,计算响应时间,事件接收(T)到输出满足全部硬约束方案的模型实际运行时间,秒,—
+T_lead,响应,执行提前量,未来计划首趟发车时刻 − 事件时刻,分钟,—
+N_chg,扰动,改动客户数,服务趟次签名集合变化的未执行客户数,个,越低越好
+R_assign,扰动,客户重分配率,N_chg / N（N为事件后未执行客户数）,%,越低越好
+R_arc,扰动,路径扰动率,1 − 2|A_prev∩A_future| / (|A_prev|+|A_future|),%,越低越好
+kept_trip_count,扰动,保留趟次,停靠签名不变的可重排趟次数,趟,—
+dropped_trip_count,扰动,删除趟次,停靠签名消失的可重排趟次数,趟,—
+new_trip_count,扰动,新增趟次,停靠签名新出现的未来趟次数,趟,—
+future_trip_count,扰动,未来趟次数,未来计划趟次总数,趟,—
+new_vehicle_count,扰动,新启用车辆数,未来计划中未沉没物理车辆数,辆,越低越好
+unfinished_customers,可行性,未完成客户数,剩余需求未完整配送的客户数,个,必须为0
+capacity_violation_count,可行性,容量违规趟次,超载重或容积的趟次数,趟,必须为0
+policy_violation_count,可行性,绿色区政策违规,燃油车在限行期到达绿色区节点的次数,次,必须为0
+schedule_violation_count,可行性,排程违规,早于就绪时刻或同车趟次重叠的违规数,次,必须为0
+all_routes_return_before_24h,可行性,24:00前返场,全部趟次是否在24:00前返回配送中心,布尔,必须为true
+passed,可行性,综合可行,V=0 且需求守恒是否全部满足,布尔,必须为true
