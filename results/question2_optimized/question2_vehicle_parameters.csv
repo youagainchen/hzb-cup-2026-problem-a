@@ -1,0 +1,6 @@
+﻿vehicle_type,propulsion,capacity_weight_kg,capacity_volume_m3,fleet_count,fixed_cost_yuan,included_in_candidate_set,parameter_source
+EV-3000,electric,3000.0,15.0,10,400.0,1,A题原题PDF第1页车型参数表述
+FUEL-3000,fuel,3000.0,13.5,60,400.0,1,A题原题PDF第1页车型参数表述
+FUEL-1500,fuel,1500.0,10.8,50,400.0,1,A题原题PDF第1页车型参数表述
+EV-1250,electric,1250.0,8.5,15,400.0,1,A题原题PDF第1页车型参数表述
+FUEL-1250,fuel,1250.0,6.5,50,400.0,1,A题原题PDF第1页车型参数表述

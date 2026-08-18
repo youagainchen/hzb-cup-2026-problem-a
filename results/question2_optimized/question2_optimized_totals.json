@@ -1,40 +1,81 @@
 {
   "solution_variant": "question2_q1_policy_repair_optimized",
-  "algorithm": "Q1路线继承 + 绿色节点顺序修复 + 10分钟发车时刻枚举 + 异构车型选择 + 多趟物理车辆复用 + 固定种子参数搜索",
+  "algorithm": "锁定Q1正式路线 + 政策可行性修复 + 路线内局部顺序优化 + 2/5/10分钟发车枚举 + 全车型选择 + 多趟物理车辆复用 + 多排序规则固定种子参数搜索",
+  "claim_scope": "基于问题一解的可行性修复与局部优化，不声称全局最优",
+  "q1_reference_id": "Q1_FINAL_38V_98T_43397.262823",
   "selected_parameters": {
-    "seed": 202603,
-    "order_rule": "green_first",
-    "startup_cost_weight": 99.0,
-    "departure_step_minutes": 10
+    "seed": 202601,
+    "order_rule": "green_late_hybrid",
+    "vehicle_reuse_weight": 60.0,
+    "departure_step_minutes": 2.0
+  },
+  "candidate_vehicle_types": [
+    "EV-3000",
+    "FUEL-3000",
+    "FUEL-1500",
+    "EV-1250",
+    "FUEL-1250"
+  ],
+  "reported_scenarios": {
+    "minimum_total_cost": {
+      "total_cost": 44861.52065028771,
+      "emissions_kg": 6823.295043260212,
+      "physical_vehicles": 37,
+      "late_cost": 4916.794065980291,
+      "seed": 202601,
+      "order_rule": "green_late_hybrid",
+      "vehicle_reuse_weight": 60.0,
+      "departure_step_minutes": 2.0
+    },
+    "minimum_cost_with_non_increasing_carbon": {
+      "total_cost": 45656.99900573061,
+      "emissions_kg": 6602.905732936038,
+      "physical_vehicles": 35,
+      "late_cost": 7287.927188960321,
+      "seed": 202603,
+      "order_rule": "green_first",
+      "vehicle_reuse_weight": 99.0,
+      "departure_step_minutes": 5.0
+    },
+    "minimum_emissions_in_search": {
+      "total_cost": 48797.59651483715,
+      "emissions_kg": 6322.970879504864,
+      "physical_vehicles": 36,
+      "late_cost": 10998.924031747054,
+      "seed": 202602,
+      "order_rule": "time_window_first",
+      "vehicle_reuse_weight": 125.0,
+      "departure_step_minutes": 10.0
+    }
   },
   "data_source": "D:\\Tencent Files\\A题\\.codex_q2_run\\data\\processed\\team_cleaned",
   "active_customers": 88,
   "green_customers": 15,
   "green_active_customers": 12,
   "delivery_trips": 98,
-  "physical_vehicles": 35,
+  "physical_vehicles": 37,
   "trip_usage_by_type": {
-    "EV-3000": 33,
-    "FUEL-3000": 65
+    "EV-3000": 29,
+    "FUEL-3000": 69
   },
   "physical_vehicle_usage": {
     "EV-3000": 10,
-    "FUEL-3000": 25
+    "FUEL-3000": 27
   },
   "propulsion_trip_count": {
-    "electric": 33,
-    "fuel": 65
+    "electric": 29,
+    "fuel": 69
   },
   "total_distance_km": 11490.977909150883,
-  "fuel_liters": 2278.931538196069,
-  "electricity_kwh": 1600.8568599908317,
-  "emissions_kg": 6606.467914640795,
-  "fixed_cost": 14000.0,
-  "energy_cost": 19968.07425605705,
-  "carbon_cost": 4294.204144516517,
-  "waiting_cost": 116.84125591796776,
-  "late_cost": 7513.852796596459,
-  "total_cost": 45892.97245308799,
+  "fuel_liters": 2391.560969524319,
+  "electricity_kwh": 1461.0563949735956,
+  "emissions_kg": 6823.295043260212,
+  "fixed_cost": 14800.0,
+  "energy_cost": 20595.911465836765,
+  "carbon_cost": 4435.141778119138,
+  "waiting_cost": 113.67334035152028,
+  "late_cost": 4916.794065980291,
+  "total_cost": 44861.52065028771,
   "feasibility": {
     "policy_violation_count": 0,
     "unfinished_customer_count": 0,
@@ -42,7 +83,7 @@
     "unfinished_volume_m3": 3.0000000031948915e-06,
     "capacity_violation_count": 0,
     "all_routes_return_before_24h": true,
-    "late_stop_count": 75
+    "late_stop_count": 59
   },
   "assumptions": [
     "绿色区客户集合读取清洗坐标表的是否绿色配送区字段",
@@ -53,12 +94,12 @@
   ],
   "policy_impact": {
     "total_cost": {
-      "absolute_change": 2495.70963,
-      "percent_change": 5.750846
+      "absolute_change": 1464.257828,
+      "percent_change": 3.374079
     },
     "physical_vehicles": {
-      "absolute_change": -3.0,
-      "percent_change": -7.894737
+      "absolute_change": -1.0,
+      "percent_change": -2.631579
     },
     "delivery_trips": {
       "absolute_change": 0.0,
@@ -69,36 +110,36 @@
       "percent_change": 0.0
     },
     "emissions_kg": {
-      "absolute_change": -29.522562,
-      "percent_change": -0.444886
+      "absolute_change": 187.304567,
+      "percent_change": 2.822556
     },
     "fuel_liters": {
-      "absolute_change": -12.536193,
-      "percent_change": -0.547081
+      "absolute_change": 100.093238,
+      "percent_change": 4.368084
     },
     "electricity_kwh": {
-      "absolute_change": 4.804635,
-      "percent_change": 0.301032
+      "absolute_change": -134.99583,
+      "percent_change": -8.458109
     },
     "fixed_cost": {
-      "absolute_change": -1200.0,
-      "percent_change": -7.894737
+      "absolute_change": -400.0,
+      "percent_change": -2.631579
     },
     "energy_cost": {
-      "absolute_change": -87.520829,
-      "percent_change": -0.436391
+      "absolute_change": 540.316381,
+      "percent_change": 2.694093
     },
     "carbon_cost": {
-      "absolute_change": -19.189665,
-      "percent_change": -0.444886
+      "absolute_change": 121.747968,
+      "percent_change": 2.822556
     },
     "waiting_cost": {
-      "absolute_change": -78.608092,
-      "percent_change": -40.219163
+      "absolute_change": -81.776007,
+      "percent_change": -41.84
     },
     "late_cost": {
-      "absolute_change": 3881.028216,
-      "percent_change": 106.832249
+      "absolute_change": 1283.969485,
+      "percent_change": 35.343559
     }
   }
 }

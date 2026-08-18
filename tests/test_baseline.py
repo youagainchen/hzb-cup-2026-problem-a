@@ -78,6 +78,22 @@ class BaselineTests(unittest.TestCase):
             optimize_departures=False,
         )
         self.assertEqual(result.policy_violation_count, 0)
+
+    def test_q2_policy_half_open_boundary_times(self) -> None:
+        policy = Q2Policy(frozenset({1}))
+        cases = (
+            (479.0, False),
+            (480.0, True),
+            (959.0, True),
+            (960.0, False),
+        )
+        for arrival_minutes, expected in cases:
+            with self.subTest(arrival_minutes=arrival_minutes):
+                self.assertEqual(
+                    policy.violates("fuel", 1, arrival_minutes),
+                    expected,
+                )
+
     def test_split_delivery_and_capacity(self) -> None:
         problem = _problem()
         fleet = (VehicleType("TEST", "electric", 3000.0, 10.0, 2),)

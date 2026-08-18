@@ -1,0 +1,5 @@
+﻿clock,arrival_minutes,propulsion,green_customer_id,expected,actual,test_result
+07:59,479.0,fuel,2,ALLOW,ALLOW,PASS
+08:00,480.0,fuel,2,DENY,DENY,PASS
+15:59,959.0,fuel,2,DENY,DENY,PASS
+16:00,960.0,fuel,2,ALLOW,ALLOW,PASS

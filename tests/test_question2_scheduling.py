@@ -7,7 +7,10 @@ import numpy as np
 from src.model.domain import Delivery, ProblemData, Route, VehicleType
 from src.model.evaluator import RouteEvaluator, evaluate_solution
 from src.model.policy_q2 import build_q2_policy
-from src.solver.q2_scheduling import schedule_q2_routes
+from src.solver.q2_scheduling import (
+    refine_fixed_schedule_departures,
+    schedule_q2_routes,
+)
 from src.solver.scheduling import validate_vehicle_schedule
 
 
@@ -74,6 +77,34 @@ class Question2SchedulingTests(unittest.TestCase):
         self.assertEqual([item.customer_id for item in routes[0].deliveries], [2, 1])
         result = evaluate_solution(routes, evaluator, optimize_departures=False)
         self.assertEqual(result.policy_violation_count, 0)
+
+    def test_fixed_schedule_departure_refinement_never_worsens_cost(self) -> None:
+        problem = ProblemData(
+            distance=np.array([[0.0, 5.0], [5.0, 0.0]]),
+            demands={1: (80.0, 1.0)},
+            windows={1: (480.0, 900.0)},
+            coordinates={0: (0.0, 0.0), 1: (20.0, 0.0)},
+            all_customer_ids=(1,),
+        )
+        electric = VehicleType("EV", "electric", 100.0, 5.0, 1)
+        routes = [
+            Route(
+                electric,
+                1,
+                [Delivery(1, 80.0, 1.0)],
+                start_minutes=487.0,
+            )
+        ]
+        evaluator = RouteEvaluator(problem)
+        before = evaluate_solution(routes, evaluator, optimize_departures=False)
+        refined, after = refine_fixed_schedule_departures(
+            routes,
+            evaluator,
+            step_minutes=2.0,
+        )
+        self.assertLessEqual(after.total_cost, before.total_cost + 1e-9)
+        self.assertEqual(refined[0].vehicle_number, routes[0].vehicle_number)
+        self.assertEqual(refined[0].trip_number, routes[0].trip_number)
 
 
 if __name__ == "__main__":

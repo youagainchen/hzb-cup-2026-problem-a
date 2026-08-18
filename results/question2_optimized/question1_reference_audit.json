@@ -1,0 +1,81 @@
+{
+  "reference_id": "Q1_FINAL_38V_98T_43397.262823",
+  "status": "locked_and_recomputed",
+  "legacy_versions_excluded": [
+    "38辆/99趟/47141.61元",
+    "55辆/122趟/57027.00元"
+  ],
+  "data_source": "D:\\Tencent Files\\A题\\.codex_q2_run\\data\\processed\\team_cleaned",
+  "evaluator": "src.model.evaluator.RouteEvaluator",
+  "vehicle_types": [
+    {
+      "name": "EV-3000",
+      "propulsion": "electric",
+      "capacity_weight": 3000.0,
+      "capacity_volume": 15.0,
+      "count": 10,
+      "fixed_cost": 400.0
+    },
+    {
+      "name": "FUEL-3000",
+      "propulsion": "fuel",
+      "capacity_weight": 3000.0,
+      "capacity_volume": 13.5,
+      "count": 60,
+      "fixed_cost": 400.0
+    },
+    {
+      "name": "FUEL-1500",
+      "propulsion": "fuel",
+      "capacity_weight": 1500.0,
+      "capacity_volume": 10.8,
+      "count": 50,
+      "fixed_cost": 400.0
+    },
+    {
+      "name": "EV-1250",
+      "propulsion": "electric",
+      "capacity_weight": 1250.0,
+      "capacity_volume": 8.5,
+      "count": 15,
+      "fixed_cost": 400.0
+    },
+    {
+      "name": "FUEL-1250",
+      "propulsion": "fuel",
+      "capacity_weight": 1250.0,
+      "capacity_volume": 6.5,
+      "count": 50,
+      "fixed_cost": 400.0
+    }
+  ],
+  "delivery_trips": 98,
+  "physical_vehicles": 38,
+  "total_cost": 43397.26282263685,
+  "total_distance_km": 11490.977909150883,
+  "emissions_kg": 6635.990476492311,
+  "latest_return_minutes": 1439.2879754638802,
+  "checks": {
+    "delivery_trips_match": true,
+    "physical_vehicles_match": true,
+    "total_cost_match": true,
+    "distance_match": true,
+    "emissions_match": true,
+    "demand_complete": true,
+    "capacity_valid": true,
+    "all_routes_return_before_24h": true
+  },
+  "evidence_files": {
+    "results\\routes\\question1_optimized_routes.csv": "7dd60dd667d6a2970eb8b24b0c969c555ca19b2e75eabcb446557b59372b1b8b",
+    "results\\tables\\question1_optimized_route_summary.csv": "421160b530f6849b271924eddfeabe518462d0a02607d4edd7c168e381b01000",
+    "results\\tables\\question1_optimized_totals.json": "c05a0b4f5c0c79da15b67e83785c0e794f5a5510dc0ce797ac94ad7e20b2bc07"
+  },
+  "shared_model_rules": {
+    "cleaned_data": "data/processed/team_cleaned",
+    "service_minutes": 20,
+    "return_deadline_minutes": 1440,
+    "split_delivery_allowed": true,
+    "multitrip_allowed": true,
+    "fixed_cost_charged_per_physical_vehicle": true
+  }
+}

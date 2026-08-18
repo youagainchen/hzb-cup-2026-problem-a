@@ -15,7 +15,8 @@ from src.solver.scheduling import validate_vehicle_schedule
 class Q2ScheduleRun:
     seed: int
     order_rule: str
-    startup_cost_weight: float
+    vehicle_reuse_weight: float
+    departure_step_minutes: float
     routes: tuple[Route, ...]
     evaluation: SolutionEvaluation
 
@@ -32,13 +33,10 @@ def _sequence_variants(
     vehicle: VehicleType,
     evaluator: RouteEvaluator,
 ) -> tuple[tuple[Delivery, ...], ...]:
-    """给含绿色区节点的燃油趟次生成少量有解释性的访问顺序候选。"""
+    """生成少量可解释的2-opt/Or-opt近似顺序候选。"""
 
     original = tuple(source.deliveries)
-    if vehicle.propulsion != "fuel" or not any(
-        item.customer_id in evaluator.problem.green_customer_ids
-        for item in original
-    ):
+    if len(original) <= 1:
         return (original,)
 
     green_ids = evaluator.problem.green_customer_ids
@@ -49,14 +47,40 @@ def _sequence_variants(
         window = evaluator.problem.windows[item.customer_id]
         return (window[1], window[0], item.customer_id)
 
-    candidates = (
+    def nearest_neighbor(items: tuple[Delivery, ...]) -> tuple[Delivery, ...]:
+        remaining = list(items)
+        current = 0
+        ordered: list[Delivery] = []
+        while remaining:
+            best_index = min(
+                range(len(remaining)),
+                key=lambda index: (
+                    float(
+                        evaluator.problem.distance[
+                            current, remaining[index].customer_id
+                        ]
+                    ),
+                    by_deadline(remaining[index]),
+                ),
+            )
+            chosen = remaining.pop(best_index)
+            ordered.append(chosen)
+            current = chosen.customer_id
+        return tuple(ordered)
+
+    candidates: tuple[tuple[Delivery, ...], ...] = (
         original,
         tuple(reversed(original)),
-        non_green + green,
-        tuple(sorted(non_green, key=by_deadline))
-        + tuple(sorted(green, key=by_deadline)),
         tuple(sorted(original, key=by_deadline)),
+        nearest_neighbor(original),
     )
+    if vehicle.propulsion == "fuel" and green:
+        candidates += (
+            non_green + green,
+            tuple(sorted(non_green, key=by_deadline))
+            + tuple(sorted(green, key=by_deadline)),
+            nearest_neighbor(non_green) + tuple(sorted(green, key=by_deadline)),
+        )
     unique: list[tuple[Delivery, ...]] = []
     seen: set[tuple[tuple[int, float, float], ...]] = set()
     for candidate in candidates:
@@ -76,6 +100,7 @@ def best_compliant_route_variant(
     evaluator: RouteEvaluator,
     *,
     earliest: float = 8.0 * 60.0,
+    step_minutes: float = 10.0,
 ) -> tuple[Route, RouteEvaluation]:
     """在访问顺序与发车时刻上同时选择成本最低的合规趟次。"""
 
@@ -94,6 +119,7 @@ def best_compliant_route_variant(
                 candidate,
                 evaluator,
                 earliest=earliest,
+                step_minutes=step_minutes,
             )
         except ValueError:
             continue
@@ -158,8 +184,18 @@ def _route_key(
         float(evaluator.problem.distance[left, right])
         for left, right in zip(nodes, nodes[1:])
     )
+    baseline = evaluator.evaluate(route, 8.0 * 60.0)
+    late_risk = sum(stop.late_minutes for stop in baseline.stops)
     if order_rule == "green_first":
         return (-green_count, earliest_deadline, -distance, tie_breaker)
+    if order_rule in {"time_window_first", "deadline"}:
+        return (earliest_deadline, -late_risk, -green_count, -distance, tie_breaker)
+    if order_rule == "late_risk_first":
+        return (-late_risk, earliest_deadline, -green_count, -distance, tie_breaker)
+    if order_rule == "green_late_hybrid":
+        return (-green_count, -late_risk, earliest_deadline, -distance, tie_breaker)
+    if order_rule == "distance_late":
+        return (-distance, -late_risk, earliest_deadline, -green_count, tie_breaker)
     if order_rule == "long_first":
         return (-distance, earliest_deadline, -green_count, tie_breaker)
     if order_rule == "late_first":
@@ -173,7 +209,8 @@ def schedule_q2_routes(
     *,
     seed: int,
     order_rule: str = "green_first",
-    startup_cost_weight: float = 400.0,
+    vehicle_reuse_weight: float = 400.0,
+    departure_step_minutes: float = 10.0,
     vehicle_types: tuple[VehicleType, ...] = DEFAULT_VEHICLE_TYPES,
     turnaround_minutes: float = 0.0,
 ) -> list[Route]:
@@ -213,13 +250,14 @@ def schedule_q2_routes(
                         source,
                         vehicle,
                         evaluator,
+                        step_minutes=departure_step_minutes,
                     )
                 except ValueError:
                     result = None
                 if result is not None:
                     variable_cost = result.total_cost - vehicle.fixed_cost
                     choice = (
-                        variable_cost + startup_cost_weight,
+                        variable_cost + vehicle_reuse_weight,
                         result.finish_minutes,
                         candidate,
                         vehicle.name,
@@ -241,6 +279,7 @@ def schedule_q2_routes(
                         vehicle,
                         evaluator,
                         earliest=earliest,
+                        step_minutes=departure_step_minutes,
                     )
                 except ValueError:
                     result = None
@@ -279,25 +318,94 @@ def schedule_q2_routes(
     return scheduled
 
 
+def refine_fixed_schedule_departures(
+    routes: Sequence[Route],
+    evaluator: RouteEvaluator,
+    *,
+    step_minutes: float,
+    turnaround_minutes: float = 0.0,
+) -> tuple[list[Route], SolutionEvaluation]:
+    """保持车型、物理车、趟次链和访问顺序不变，细化发车时刻。"""
+
+    candidates = [
+        Route(
+            vehicle_type=route.vehicle_type,
+            vehicle_number=route.vehicle_number,
+            deliveries=[
+                Delivery(item.customer_id, item.weight, item.volume)
+                for item in route.deliveries
+            ],
+            start_minutes=route.start_minutes,
+            trip_number=route.trip_number,
+        )
+        for route in routes
+    ]
+    chains: dict[tuple[str, int], list[Route]] = defaultdict(list)
+    for route in candidates:
+        chains[(route.vehicle_type.name, route.vehicle_number)].append(route)
+    for chain in chains.values():
+        earliest = 8.0 * 60.0
+        for route in sorted(chain, key=lambda item: item.trip_number):
+            result = best_compliant_departure(
+                route,
+                evaluator,
+                earliest=earliest,
+                step_minutes=step_minutes,
+            )
+            earliest = result.finish_minutes + turnaround_minutes
+    validate_vehicle_schedule(candidates, evaluator)
+    refined = evaluate_solution(candidates, evaluator, optimize_departures=False)
+
+    original = [
+        Route(
+            vehicle_type=route.vehicle_type,
+            vehicle_number=route.vehicle_number,
+            deliveries=[
+                Delivery(item.customer_id, item.weight, item.volume)
+                for item in route.deliveries
+            ],
+            start_minutes=route.start_minutes,
+            trip_number=route.trip_number,
+        )
+        for route in routes
+    ]
+    original_evaluation = evaluate_solution(
+        original,
+        evaluator,
+        optimize_departures=False,
+    )
+    if refined.total_cost < original_evaluation.total_cost - 1e-9:
+        return candidates, refined
+    return original, original_evaluation
+
+
 def search_q2_schedules(
     source_routes: Sequence[Route],
     evaluator: RouteEvaluator,
     *,
     seeds: Sequence[int],
-    order_rules: Sequence[str] = ("green_first", "deadline", "long_first"),
-    startup_cost_weights: Sequence[float] = (300.0, 400.0, 500.0),
+    order_rules: Sequence[str] = (
+        "green_first",
+        "time_window_first",
+        "late_risk_first",
+        "green_late_hybrid",
+        "distance_late",
+    ),
+    vehicle_reuse_weights: Sequence[float] = (300.0, 400.0, 500.0),
+    departure_step_minutes: float = 10.0,
 ) -> tuple[Q2ScheduleRun, tuple[Q2ScheduleRun, ...]]:
     runs: list[Q2ScheduleRun] = []
     for seed in seeds:
         for order_rule in order_rules:
-            for startup_weight in startup_cost_weights:
+            for reuse_weight in vehicle_reuse_weights:
                 try:
                     routes = schedule_q2_routes(
                         source_routes,
                         evaluator,
                         seed=int(seed),
                         order_rule=order_rule,
-                        startup_cost_weight=float(startup_weight),
+                        vehicle_reuse_weight=float(reuse_weight),
+                        departure_step_minutes=float(departure_step_minutes),
                     )
                     validate_solution(evaluator.problem, routes)
                     validate_vehicle_schedule(routes, evaluator)
@@ -319,7 +427,8 @@ def search_q2_schedules(
                     Q2ScheduleRun(
                         seed=int(seed),
                         order_rule=order_rule,
-                        startup_cost_weight=float(startup_weight),
+                        vehicle_reuse_weight=float(reuse_weight),
+                        departure_step_minutes=float(departure_step_minutes),
                         routes=tuple(routes),
                         evaluation=result,
                     )
