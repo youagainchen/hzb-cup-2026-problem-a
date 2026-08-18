@@ -1,0 +1,4 @@
+﻿severity,event_count,trigger_clock,dynamic_total_cost,delta_cost,cost_change_ratio,response_time_s,lead_time_minutes,changed_customer_count,assignment_change_ratio,arc_change_ratio,future_trip_count,policy_violation_count,schedule_violation_count,unfinished_customer_count,return_before_24h,passed
+low,4,10:00,44847.873715842106,-13.646934447533567,-0.0003042013344557784,0.007303200021851808,4.0,3,0.046875,0.0234375,83,0,0,0,True,True
+medium,4,10:00,44908.94983834988,47.42918806023954,0.0010572354073765291,0.008442399965133518,4.0,2,0.03125,0.015625,83,0,0,0,True,True
+high,4,10:00,44956.09535335607,94.5747030664279,0.002108147510283232,0.006983899977058172,4.0,2,0.03125,0.015625,83,0,0,0,True,True

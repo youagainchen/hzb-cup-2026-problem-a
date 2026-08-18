@@ -1,0 +1,67 @@
+{
+  "static_total_cost": 44861.52065028964,
+  "scenario_design": {
+    "low": "取消c13；新增300kg/0.9m³；c82变址至(16,-16)；c70改窗+15min",
+    "medium": "取消c12；新增600kg/1.8m³；c82变址至(20,-20)；c70改窗+30min",
+    "high": "取消c12；新增1000kg/3.0m³；c82变址至(23,-23)；c70改窗+45min"
+  },
+  "results": [
+    {
+      "severity": "low",
+      "event_count": 4,
+      "trigger_clock": "10:00",
+      "dynamic_total_cost": 44847.873715842106,
+      "delta_cost": -13.646934447533567,
+      "cost_change_ratio": -0.0003042013344557784,
+      "response_time_s": 0.007303200021851808,
+      "lead_time_minutes": 4.0,
+      "changed_customer_count": 3,
+      "assignment_change_ratio": 0.046875,
+      "arc_change_ratio": 0.0234375,
+      "future_trip_count": 83,
+      "policy_violation_count": 0,
+      "schedule_violation_count": 0,
+      "unfinished_customer_count": 0,
+      "return_before_24h": true,
+      "passed": true
+    },
+    {
+      "severity": "medium",
+      "event_count": 4,
+      "trigger_clock": "10:00",
+      "dynamic_total_cost": 44908.94983834988,
+      "delta_cost": 47.42918806023954,
+      "cost_change_ratio": 0.0010572354073765291,
+      "response_time_s": 0.008442399965133518,
+      "lead_time_minutes": 4.0,
+      "changed_customer_count": 2,
+      "assignment_change_ratio": 0.03125,
+      "arc_change_ratio": 0.015625,
+      "future_trip_count": 83,
+      "policy_violation_count": 0,
+      "schedule_violation_count": 0,
+      "unfinished_customer_count": 0,
+      "return_before_24h": true,
+      "passed": true
+    },
+    {
+      "severity": "high",
+      "event_count": 4,
+      "trigger_clock": "10:00",
+      "dynamic_total_cost": 44956.09535335607,
+      "delta_cost": 94.5747030664279,
+      "cost_change_ratio": 0.002108147510283232,
+      "response_time_s": 0.006983899977058172,
+      "lead_time_minutes": 4.0,
+      "changed_customer_count": 2,
+      "assignment_change_ratio": 0.03125,
+      "arc_change_ratio": 0.015625,
+      "future_trip_count": 83,
+      "policy_violation_count": 0,
+      "schedule_violation_count": 0,
+      "unfinished_customer_count": 0,
+      "return_before_24h": true,
+      "passed": true
+    }
+  ]
+}

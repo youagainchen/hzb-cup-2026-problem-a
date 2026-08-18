@@ -1,0 +1,5 @@
+﻿event_id,event_type,event_type_label,customer_id,trigger_time_minutes,trigger_clock,severity,old_value,new_value,weight_kg,volume_m3,window_start_minutes,window_end_minutes,new_x_km,new_y_km,description
+E01,cancel,订单取消,12,600.0,10:00,medium,active 1726.8kg/4.74m³,0（取消）,,,,,,,10:00 取消客户 12 的全部当日订单（medium）
+E02,new_order,新增订单,99,600.0,10:00,medium,—（新客户）,"600.0kg/1.80m³，窗[13:00,15:00]，坐标(5.00,6.00)",600.0,1.8,780.0,900.0,5.0,6.0,"10:00 新增订单：客户 99（新节点） 600.0kg/1.80m³，窗[13:00,15:00]（medium）"
+E03,address_change,配送地址变更,82,600.0,10:00,medium,"(14.51,-14.91)","(20.00,-20.00)",,,,,20.0,-20.0,"10:00 客户 82 配送地址变更为 (20.00,-20.00)（medium）"
+E04,time_window_change,时间窗调整,70,600.0,10:00,medium,"[11:36,12:35]","[12:06,13:05]",,,726.0,785.0,,,"10:00 客户 70 时间窗调整为 [12:06,13:05]（medium）"

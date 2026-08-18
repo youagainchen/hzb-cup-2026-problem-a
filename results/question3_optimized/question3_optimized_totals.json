@@ -1,0 +1,49 @@
+{
+  "algorithm": "rolling-horizon event operators: cancel/remove, new-order insertion, address local reorder, time-window reorder, fleet rescheduling",
+  "static_total_cost": 44861.52065028964,
+  "event_batch_count": 1,
+  "all_batches_passed": true,
+  "batches": [
+    {
+      "trigger_time_minutes": 600.0,
+      "trigger_clock": "10:00",
+      "event_count": 4,
+      "event_types": [
+        "cancel",
+        "new_order",
+        "address_change",
+        "time_window_change"
+      ],
+      "response_time_s": 0.004716399998869747,
+      "executed_cost": 10514.584864516053,
+      "future_fixed_cost": 8800.0,
+      "future_operating_cost": 25594.364973833828,
+      "future_cost": 34394.36497383383,
+      "total_cost": 44908.94983834988,
+      "static_total_cost": 44861.52065028964,
+      "delta_cost": 47.42918806023954,
+      "cost_change_ratio": 0.0010572354073765291,
+      "lead_time_minutes": 4.0,
+      "frozen_trip_count": 15,
+      "replannable_trip_count": 83,
+      "future_trip_count": 83,
+      "dropped_trip_count": 1,
+      "new_trip_count": 1,
+      "kept_trip_count": 82,
+      "changed_customer_count": 2,
+      "assignment_change_ratio": 0.03125,
+      "arc_change_ratio": 0.015625,
+      "feasibility": {
+        "passed": true,
+        "demand_unfinished_customers": 0,
+        "demand_unfinished_weight_kg": 0.0,
+        "demand_unfinished_volume_m3": 0.0,
+        "capacity_violation_count": 0,
+        "policy_violation_count": 0,
+        "schedule_violation_count": 0,
+        "all_routes_return_before_24h": true,
+        "notes": []
+      }
+    }
+  ]
+}

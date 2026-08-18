@@ -87,3 +87,13 @@ run_question2.cmd --optimized
 - 原始 Excel 不修改；清洗结果写入 `data/processed/`。
 - 提交信息使用简短中文，例如：`数据：完成订单缺失值审计`。
 - 合并前至少检查漏单、重复、超载、时间窗、限行和成本汇总。
+
+## 问题三动态调度
+
+1 号动态调度器位于 `src/solver/q3_dynamic.py`，只调用 2 号维护的 `apply_events`、`extract_freeze_state` 和 `evaluate_dynamic`，不复制事件判定或动态成本口径。运行：
+
+```powershell
+python tools/run_q3_optimized.py
+```
+
+输出 `results/question3_optimized/`，包括未来路线、逐事件响应日志和动态成本汇总。正式四事件场景通过冻结、需求完整、容量、政策、排程和 24:00 返场检查后才会写出结果。
