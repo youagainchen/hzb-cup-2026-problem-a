@@ -1,12 +1,21 @@
 # -*- coding: utf-8 -*-
-"""问题三论文作图脚本（2号）：生成 6 张图到 results/figures/。
+"""问题三论文作图脚本（独立设计，非旧脚本复刻）。
 
-- 图1 动态调度流程图（事件驱动 + 发车级冻结 + 分层重优化 + 统一评估）
-- 图2 动态响应后路线空间分布（全图 + 绿色区局部放大，突出 c99 承接）
-- 图3 成本构成与 ΔC 瀑布图（冻结承诺 + 未来固定 + 未来运行）
-- 图4 事件严重度敏感性（low/medium/high → ΔC 与扰动）
-- 图5 动态响应后车辆甘特图
-- 图6 单事件边际成本与组合对比
+围绕问题三要回答评审的四个问题组织 6 张必要图：
+
+- 图1 发车级冻结（方法：τ=10:00 前已发车趟次整趟锁定，未来趟次滚动重排）
+- 图2 核心机制：取消 c12 释放新能源趟次 → 新增 c99 被同一趟次承接（全文关键结论）
+- 图3 当日成本分解与 ΔC 瀑布（结果：成本增量 +47.43 元 / +0.11%）
+- 图4 响应时间与扰动（结果：~16ms 实时响应，改动 1 个客户、1% 路径）
+- 图5 事件严重度敏感性（鲁棒：成本随强度单调）
+- 图6 单事件边际成本与组合协同（机制：I = -8.05 正向协同）
+
+数据来源（只读结果文件，不重跑求解器）：
+- results/question3_optimized/question3_optimized_totals.json
+- results/question3_optimized/question3_optimized_future_routes.csv
+- results/question3/question3_event_set.csv
+- results/question3_sensitivity/question3_severity_sensitivity.json
+- results/question2_optimized/question2_optimized_routes.csv / *_route_summary.csv（事件前静态）
 
 运行：python tools/plot_question3_figures.py
 """
@@ -21,9 +30,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Circle
+import numpy as np
+from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
 
 from src.data.loader import load_problem_data
 from src.model.domain import DEFAULT_VEHICLE_TYPES, Delivery, Route
@@ -34,37 +45,53 @@ from src.solver.q2_initial import load_route_solution
 from tools.run_q3_optimized import read_event_sets
 
 # ---------------------------------------------------------------------------
-# 全局配色与字体（与问题二图保持一致）
+# 配色与常量
 # ---------------------------------------------------------------------------
-ELECTRIC = "#4C78A8"  # 蓝
-FUEL = "#F58518"      # 橙
-GREEN = "#54A24B"     # 绿
-RED = "#E45756"       # 红
+ELECTRIC = "#4C78A8"   # 蓝：新能源
+FUEL = "#F58518"       # 橙：燃油
+GREEN = "#54A24B"      # 绿：绿色区 / 负向
+RED = "#E45756"        # 红：正向 / 静态基准
 TEAL = "#72B7B2"
 GRAY = "#A8B0BC"
+PURPLE = "#7B1FA2"     # 紫：c99 / 组合
 TEXT = "#263238"
 GRID = "#D9DEE7"
 
-RESTRICT_START = 480.0  # 08:00
-RESTRICT_END = 960.0    # 16:00
+RESTRICT_START = 480.0
+RESTRICT_END = 960.0
 GREEN_ZONE_RADIUS = 10.0
-OUTPUT_DIR = Path("results/figures")
 
+OUTPUT_DIR = Path("results/figures")
 DATA_DIR = Path("data/processed/team_cleaned")
-ROUTES_CSV = Path("results/question2_optimized/question2_optimized_routes.csv")
-SUMMARY_CSV = Path("results/question2_optimized/question2_optimized_route_summary.csv")
+STATIC_ROUTES_CSV = Path("results/question2_optimized/question2_optimized_routes.csv")
+STATIC_SUMMARY_CSV = Path("results/question2_optimized/question2_optimized_route_summary.csv")
 TOTALS_JSON = Path("results/question3_optimized/question3_optimized_totals.json")
 FUTURE_ROUTES_CSV = Path("results/question3_optimized/question3_optimized_future_routes.csv")
 EVENT_CSV = Path("results/question3/question3_event_set.csv")
 SENS_JSON = Path("results/question3_sensitivity/question3_severity_sensitivity.json")
 
+CANCELLED_CUSTOMER = 12
+NEW_CUSTOMER = 99
+ADDRESS_CHANGED_CUSTOMER = 82
+
+# 单事件隔离结果（问题三文档 §11.2；结果目录未单独存档，作为论文口径常量）
+SINGLE_EVENT_DELTAS = [
+    ("取消 c12", -3.19),
+    ("新增 c99", +40.51),
+    ("变址 c82", +43.16),
+    ("改窗 c70", -25.00),
+]
+COMBINED_DELTA = 47.43
+SYNERGY = COMBINED_DELTA - sum(d for _, d in SINGLE_EVENT_DELTAS)  # -8.05
+
+# 计算响应时间（问题三文档 §11.1，N=30 重复实验）
+RESPONSE_MEDIAN_MS = 15.7
+RESPONSE_P95_MS = 18.9
+
 
 def configure_font() -> None:
     plt.rcParams["font.sans-serif"] = [
-        "Microsoft YaHei",
-        "SimHei",
-        "Arial Unicode MS",
-        "DejaVu Sans",
+        "Microsoft YaHei", "SimHei", "Arial Unicode MS", "DejaVu Sans",
     ]
     plt.rcParams["axes.unicode_minus"] = False
 
@@ -79,400 +106,388 @@ def _fmt(minutes: float) -> str:
     return f"{hours:02d}:{mins:02d}"
 
 
-def read_event_set() -> object:
-    return read_event_sets(EVENT_CSV)[0]
+def _find_trip_by_customer(routes, customer_id: int) -> Route | None:
+    return next(
+        (r for r in routes if any(d.customer_id == customer_id for d in r.deliveries)),
+        None,
+    )
 
 
 def build_future_routes(problem_after) -> tuple[list[Route], RouteEvaluator]:
-    """从未来路线 CSV 重建 Route 对象并用事件后评估器评分。"""
-    vehicles = {vehicle.name: vehicle for vehicle in DEFAULT_VEHICLE_TYPES}
+    vehicles = {v.name: v for v in DEFAULT_VEHICLE_TYPES}
     deliveries: dict[str, list[Delivery]] = defaultdict(list)
     meta: dict[str, dict] = {}
     order: list[str] = []
     with FUTURE_ROUTES_CSV.open(newline="", encoding="utf-8-sig") as stream:
-        rows = sorted(
-            csv.DictReader(stream),
-            key=lambda row: (row["route_id"], int(row["sequence"])),
-        )
+        rows = sorted(csv.DictReader(stream),
+                      key=lambda row: (row["route_id"], int(row["sequence"])))
     for row in rows:
-        route_id = row["route_id"]
-        if route_id not in deliveries:
-            order.append(route_id)
-            meta[route_id] = {
+        rid = row["route_id"]
+        if rid not in deliveries:
+            order.append(rid)
+            meta[rid] = {
                 "vehicle_name": row["vehicle_type"],
                 "vehicle_number": int(row["physical_vehicle_id"].rsplit("-", 1)[1]),
                 "trip_number": int(row["trip_number"]),
                 "start_minutes": float(row["start_minutes"]),
             }
-        deliveries[route_id].append(
-            Delivery(
-                int(row["customer_id"]),
-                float(row["delivered_weight_kg"]),
-                float(row["delivered_volume_m3"]),
-            )
+        deliveries[rid].append(
+            Delivery(int(row["customer_id"]), float(row["delivered_weight_kg"]),
+                     float(row["delivered_volume_m3"]))
         )
-    policy = build_q2_policy(problem_after.green_customer_ids)
-    evaluator = RouteEvaluator(problem_after, policy)
+    evaluator = RouteEvaluator(
+        problem_after, build_q2_policy(problem_after.green_customer_ids)
+    )
     routes = []
-    for route_id in order:
-        info = meta[route_id]
-        routes.append(
-            Route(
-                vehicle_type=vehicles[info["vehicle_name"]],
-                vehicle_number=info["vehicle_number"],
-                deliveries=deliveries[route_id],
-                start_minutes=info["start_minutes"],
-                trip_number=info["trip_number"],
-            )
-        )
+    for rid in order:
+        info = meta[rid]
+        routes.append(Route(
+            vehicle_type=vehicles[info["vehicle_name"]],
+            vehicle_number=info["vehicle_number"],
+            deliveries=deliveries[rid],
+            start_minutes=info["start_minutes"],
+            trip_number=info["trip_number"],
+        ))
     return routes, evaluator
 
 
+def _vehicle_trips(routes, evaluator, name: str, number: int):
+    """返回某物理车辆的全部趟次（含评估出的起止时刻），按发车时刻排序。"""
+    trips = [r for r in routes if r.vehicle_type.name == name and r.vehicle_number == number]
+    scored = [(r, evaluator.evaluate(r, r.start_minutes)) for r in trips]
+    scored.sort(key=lambda item: item[1].start_minutes)
+    return scored
+
+
 # ---------------------------------------------------------------------------
-# 图 1  动态调度流程图
+# 图 1  发车级冻结：τ=10:00 前已发车趟次整趟锁定，未来趟次重排
 # ---------------------------------------------------------------------------
-def plot_fig1_flow(output: Path) -> None:
-    steps = [
-        ("事件到达 (τk)", "#E8F1F8", ELECTRIC),
-        ("发车级冻结：\n已发车趟次整趟锁定", "#E8F1F8", ELECTRIC),
-        ("更新订单状态：\n取消 / 新增 / 变址 / 改窗", "#E8F1F8", ELECTRIC),
-        ("提取未来未执行任务\n（剩余需求 + 车辆就绪时刻）", "#E8F1F8", ELECTRIC),
-        ("分层重优化 L0→L1→L2→L3\n参数→趟内→趟间→车辆级", "#FDF2E3", FUEL),
-        ("统一评估器验收\n硬约束 V=0", "#EAF3E5", GREEN),
-        ("输出：成本增量 / 响应时间 / 扰动", "#F2E5F0", TEAL),
+def plot_fig1_freeze(static_routes, static_eval, output: Path) -> None:
+    """把问题二 98 趟静态计划画在时间轴上，按发车级冻结规则切分：
+    发车时刻 ≤ τ(=10:00) 的趟次整趟冻结（灰），> τ 的趟次可重排（蓝/橙）。"""
+    trigger = 600.0
+    scored = [(r, static_eval.evaluate(r, r.start_minutes)) for r in static_routes]
+    scored.sort(key=lambda item: item[1].start_minutes)
+    n = len(scored)
+    frozen = [s for s in scored if s[1].start_minutes <= trigger + 1e-9]
+    replannable = [s for s in scored if s[1].start_minutes > trigger + 1e-9]
+
+    fig, ax = plt.subplots(figsize=(12, max(6.5, n * 0.11)), dpi=160)
+    ax.axvspan(RESTRICT_START, RESTRICT_END, color=RED, alpha=0.06, zorder=0)
+
+    for i, (route, res) in enumerate(scored):
+        y = n - 1 - i  # 最早发车排在最上
+        if res.start_minutes <= trigger + 1e-9:
+            color = GRAY
+        else:
+            color = ELECTRIC if route.vehicle_type.propulsion == "electric" else FUEL
+        ax.barh(y, res.finish_minutes - res.start_minutes, left=res.start_minutes,
+                height=0.75, color=color, alpha=0.9, zorder=2)
+
+    ax.axvline(trigger, color=RED, lw=2.2, ls="--", zorder=4)
+    ax.text(trigger, n + 1.2, "事件 τ=10:00\n（发车级冻结边界）", color=RED,
+            ha="center", va="bottom", fontsize=9.5)
+    ax.text((RESTRICT_START + trigger) / 2, n + 1.2,
+            f"已发车冻结\n{len(frozen)} 趟", color=GRAY, ha="center", va="bottom",
+            fontsize=10, fontweight="bold")
+    ax.text((trigger + 1440) / 2, n + 1.2,
+            f"未来可重排\n{len(replannable)} 趟", color=TEXT, ha="center", va="bottom",
+            fontsize=10, fontweight="bold")
+
+    ax.set_yticks([])
+    ax.set_xlim(RESTRICT_START, 1440)
+    ax.set_xticks(range(480, 1441, 120))
+    ax.set_xticklabels([_fmt(m) for m in range(480, 1441, 120)], fontsize=8)
+    ax.set_xlabel("时刻（每行一个配送趟次，按发车时刻排序）")
+    ax.set_ylabel("配送趟次")
+    ax.set_title(
+        f"图 1  发车级冻结：τ=10:00 前 {len(frozen)} 趟整趟锁定，"
+        f"其余 {len(replannable)} 趟进入滚动重优化", fontsize=13, pad=12,
+    )
+    ax.grid(axis="x", color=GRID, lw=0.6, alpha=0.6, zorder=1)
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, color=GRAY, label="已发车冻结趟次"),
+        plt.Rectangle((0, 0), 1, 1, color=ELECTRIC, label="新能源可重排趟次"),
+        plt.Rectangle((0, 0), 1, 1, color=FUEL, label="燃油可重排趟次"),
+        plt.Line2D([], [], color=RED, lw=2, ls="--", label="冻结边界 τ=10:00"),
     ]
-    figure, ax = plt.subplots(figsize=(7.0, 8.6), dpi=160)
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, len(steps) * 1.35 + 1.0)
-    ax.axis("off")
-    box_w, box_h = 7.4, 0.95
-    x0, y_gap = 1.3, 1.30
-    for index, (text, fc, ec) in enumerate(steps):
-        y = (len(steps) - 1 - index) * y_gap + 0.6
-        box = FancyBboxPatch(
-            (x0, y), box_w, box_h,
-            boxstyle="round,pad=0.03", fc=fc, ec=ec, lw=1.4,
-        )
-        ax.add_patch(box)
-        ax.text(
-            x0 + box_w / 2, y + box_h / 2, text,
-            ha="center", va="center", fontsize=10, color=TEXT,
-        )
-        if index < len(steps) - 1:
-            y_next = (len(steps) - 1 - index - 1) * y_gap + 0.6 + box_h
-            ax.add_patch(
-                FancyArrowPatch(
-                    (x0 + box_w / 2, y), (x0 + box_w / 2, y_next),
-                    arrowstyle="-|>", mutation_scale=16, lw=1.4, color=TEXT,
-                )
-            )
-    # 滚动时域反馈箭头
-    ax.add_patch(
-        FancyArrowPatch(
-            (x0 + box_w, 0.9), (x0 + box_w, len(steps) * y_gap - 0.4),
-            arrowstyle="-|>", mutation_scale=16, lw=1.1, color=GRAY,
-            connectionstyle="arc3,rad=-0.35",
-        )
-    )
-    ax.text(
-        x0 + box_w + 0.5, (len(steps) - 1) * y_gap,
-        "下一批事件\n（滚动时域）", fontsize=8, color=GRAY, ha="center",
-    )
-    ax.set_title("图 1  事件驱动的动态调度流程", pad=14, fontsize=13)
-    figure.tight_layout()
-    figure.savefig(output, bbox_inches="tight")
-    plt.close(figure)
+    ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=9)
+    fig.tight_layout()
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# 图 2  动态响应后路线空间分布（全图 + 绿色区局部放大）
+# 图 2  核心机制：c12 取消释放趟次 → c99 承接
 # ---------------------------------------------------------------------------
-def plot_fig2_route_map(problem, future_routes, evaluator, output: Path) -> None:
-    coords = problem.coordinates
-    green_ids = set(problem.green_customer_ids)
-    future_by_vehicle: dict[tuple[str, int], list[Route]] = defaultdict(list)
-    for route in future_routes:
-        future_by_vehicle[(route.vehicle_type.name, route.vehicle_number)].append(route)
+def plot_fig2_mechanism(problem, static_routes, static_eval, future_routes,
+                        dynamic_eval, output: Path) -> None:
+    static_c12 = _find_trip_by_customer(static_routes, CANCELLED_CUSTOMER)
+    dynamic_c99 = _find_trip_by_customer(future_routes, NEW_CUSTOMER)
+    name = static_c12.vehicle_type.name
+    number = static_c12.vehicle_number
+    vehicle_label = f"{name}-{number:03d}"
 
-    c99_trip = next(
-        (route for route in future_routes
-         if any(item.customer_id == 99 for item in route.deliveries)),
-        None,
-    )
-    c99_vehicle = (
-        (c99_trip.vehicle_type.name, c99_trip.vehicle_number) if c99_trip else None
-    )
-    affected_vehicle_keys = {
-        key for key in future_by_vehicle
-        if key in {
-            ("EV-3000", 9),   # 承接 c99 的车
-            ("EV-3000", 4),   # 变址 c82 的车
-        }
-    }
+    static_trips = _vehicle_trips(static_routes, static_eval, name, number)
+    dynamic_trips = _vehicle_trips(future_routes, dynamic_eval, name, number)
 
-    def draw_map(ax, xlim, ylim, highlight_affected: bool, title: str) -> None:
-        for key, chain in future_by_vehicle.items():
-            color = ELECTRIC if key[0].startswith("EV") else FUEL
-            lw = 1.6
-            if highlight_affected and key in affected_vehicle_keys:
-                color = RED
-                lw = 2.6
-            elif highlight_affected and key == c99_vehicle:
-                color = "#7B1FA2"
-                lw = 3.0
-            for route in chain:
-                nodes = [0, *(item.customer_id for item in route.deliveries), 0]
-                xs = [coords[node][0] for node in nodes]
-                ys = [coords[node][1] for node in nodes]
-                ax.plot(xs, ys, color=color, lw=lw, alpha=0.8,
-                        solid_capstyle="round", zorder=2)
-        circle = Circle((0, 0), GREEN_ZONE_RADIUS, fill=False, color=GREEN,
-                        lw=1.4, ls="--", zorder=1)
-        ax.add_patch(circle)
-        for customer_id, (x, y) in coords.items():
-            if customer_id == 0:
-                ax.plot(x, y, "k*", ms=11, zorder=5)
-                continue
-            if customer_id in green_ids:
-                ax.plot(x, y, "o", ms=3.4, color=GREEN, zorder=4)
-            else:
-                ax.plot(x, y, "o", ms=2.4, color=GRAY, zorder=3)
-        # 标记 c12（已取消）与 c99（新增承接）
-        ax.plot(*coords[12], "x", ms=13, mew=3, color=RED, zorder=6)
-        ax.annotate("c12（已取消）", coords[12], xytext=(coords[12][0] - 1.5, coords[12][1] + 1.6),
-                    fontsize=9, color=RED)
-        if 99 in coords:
-            ax.plot(*coords[99], "*", ms=15, color="#7B1FA2", zorder=6)
-            ax.annotate("c99（新增）", coords[99], xytext=(coords[99][0] + 0.6, coords[99][1] - 1.8),
-                        fontsize=9, color="#7B1FA2")
-        ax.plot(0, 0, "k*", ms=13, zorder=7)
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
-        ax.set_xlabel("X 坐标（km）")
-        ax.set_ylabel("Y 坐标（km）")
-        ax.set_title(title, fontsize=11)
-        ax.grid(True, color=GRID, lw=0.6, alpha=0.6)
-
-    figure, (ax_full, ax_zoom) = plt.subplots(1, 2, figsize=(13, 5.2), dpi=160)
-    x_max = max(abs(coords[cid][0]) for cid in coords) + 4
-    y_max = max(abs(coords[cid][1]) for cid in coords) + 4
-    draw_map(ax_full, (-x_max, x_max), (-y_max, y_max), True,
-             "动态响应后路线空间分布（全图）")
-    draw_map(ax_zoom, (-14, 14), (-14, 14), True, "市中心绿色配送区局部放大")
-    ax_zoom.legend(
-        handles=[
-            plt.Line2D([], [], color=ELECTRIC, lw=2, label="新能源路线"),
-            plt.Line2D([], [], color=FUEL, lw=2, label="燃油路线"),
-            plt.Line2D([], [], color=RED, lw=2.4, label="受事件影响的车辆链"),
-            plt.Line2D([], [], color="#7B1FA2", lw=3, label="承接 c99 的趟次"),
-        ],
-        loc="lower left", frameon=False, fontsize=8.5,
+    fig, (ax_before, ax_after) = plt.subplots(
+        2, 1, figsize=(10.5, 5.2), dpi=160, sharex=True, sharey=True,
     )
-    figure.suptitle("图 2  动态响应后路线空间分布（取消 c12 释放新能源车承接新增 c99）",
-                    fontsize=13, y=0.98)
-    figure.tight_layout(rect=[0, 0, 1, 0.95])
-    figure.savefig(output, bbox_inches="tight")
-    plt.close(figure)
+
+    def draw_vehicle(ax, trips, highlight_cid, title, color):
+        ax.axvspan(RESTRICT_START, RESTRICT_END, color=RED, alpha=0.07, zorder=0)
+        for route, res in trips:
+            customers = [d.customer_id for d in route.deliveries]
+            has_target = highlight_cid in customers
+            bar_color = color if has_target else ELECTRIC
+            ax.barh(0, res.finish_minutes - res.start_minutes, left=res.start_minutes,
+                    height=0.5, color=bar_color, alpha=0.9,
+                    edgecolor=TEXT, linewidth=0.5, zorder=2)
+            label = f"T{route.trip_number:02d}"
+            if has_target:
+                label += f"（{'c' + str(highlight_cid)}）"
+            ax.text(res.start_minutes + (res.finish_minutes - res.start_minutes) / 2,
+                    0.0, label, ha="center", va="center", fontsize=8, color="white")
+        ax.set_yticks([0])
+        ax.set_yticklabels([title], fontsize=10)
+        ax.set_xlim(RESTRICT_START, 1440)
+        ax.grid(axis="x", color=GRID, lw=0.6, alpha=0.6, zorder=1)
+        ax.set_axisbelow(True)
+
+    draw_vehicle(ax_before, static_trips, CANCELLED_CUSTOMER,
+                 f"事件前（静态）", RED)
+    draw_vehicle(ax_after, dynamic_trips, NEW_CUSTOMER,
+                 f"事件后（动态）", PURPLE)
+
+    ax_before.set_title(
+        f"事件前：{vehicle_label} 的 T02 趟次配送 c12（10:00 被取消）", fontsize=11)
+    ax_after.set_title(
+        f"事件后：c99 插入同一空闲趟次（绿色区，由新能源车承接，无需启用新车）", fontsize=11)
+    ticks = list(range(480, 1441, 120))
+    ax_after.set_xticks(ticks)
+    ax_after.set_xticklabels([_fmt(m) for m in ticks], fontsize=8)
+    ax_after.set_xlabel("时刻（08:00-24:00，灰红底为燃油车绿色区限行）")
+
+    fig.suptitle(
+        "图 2  核心机制：取消 c12 释放新能源趟次，新增 c99 复用该趟次（零新增车辆）",
+        fontsize=13, y=0.98,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# 图 3  成本构成与 ΔC 瀑布图
+# 图 3  当日成本分解与 ΔC 瀑布
 # ---------------------------------------------------------------------------
-def plot_fig3_cost_waterfall(output: Path) -> None:
-    totals = json.loads(TOTALS_JSON.read_text(encoding="utf-8"))
+def plot_fig3_cost(totals: dict, output: Path) -> None:
     batch = totals["batches"][0]
-    static_total = float(totals["static_total_cost"])
+    static = float(batch["static_total_cost"])
     executed = float(batch["executed_cost"])
     future_fixed = float(batch["future_fixed_cost"])
     future_oper = float(batch["future_operating_cost"])
-    dynamic_total = float(batch["total_cost"])
+    dynamic = float(batch["total_cost"])
     delta = float(batch["delta_cost"])
 
-    # 瀑布：静态 → 冻结承诺 → 未来固定 → 未来运行 → 当日总成本
-    labels = ["问题二静态\n总成本", "冻结承诺\n成本", "未来\n固定成本", "未来\n运行成本", "动态当日\n总成本"]
-    # 数值桥：用累计位置画瀑布
-    steps = [
-        (static_total, static_total),          # 起点
-        (executed, executed),                  # 冻结承诺
-        (future_fixed, executed + future_fixed),
-        (future_oper, executed + future_fixed + future_oper),
-        (dynamic_total, dynamic_total),        # 终点
-    ]
-    heights = []
-    for value, cumulative in steps:
-        if cumulative is None:
-            heights.append(value)
-        else:
-            heights.append(None)
-    # 手动构建瀑布柱
-    figure, ax = plt.subplots(figsize=(8.6, 5.0), dpi=160)
-    bar_colors = [GRAY, ELECTRIC, ELECTRIC, ELECTRIC, RED]
-    x_positions = range(len(labels))
-    bottom = [0.0, 0.0, executed, executed + future_fixed, 0.0]
-    for i, (label, value) in enumerate(zip(labels, [static_total, executed, future_fixed, future_oper, dynamic_total])):
-        if i == 0:
-            bar = ax.bar(i, value, width=0.55, color=bar_colors[i], zorder=3)
-            ax.text(i, value * 0.5, f"{value:,.2f}", ha="center", va="center",
-                    fontsize=9, color="white", fontweight="bold")
-        elif i == 4:
-            ax.bar(i, value, width=0.55, color=bar_colors[i], zorder=3)
-            ax.text(i, value + 200, f"{value:,.2f}", ha="center", fontsize=9, color=RED)
-        else:
-            ax.bar(i, value, bottom=bottom[i], width=0.55, color=bar_colors[i], zorder=3)
-            ax.text(i, bottom[i] + value / 2, f"{value:,.2f}",
-                    ha="center", va="center", fontsize=9, color="white", fontweight="bold")
-    ax.axhline(static_total, color=TEXT, lw=1.0, ls=":", zorder=2)
-    ax.text(3.6, static_total + 180, f"问题二基准 {static_total:,.2f}",
-            fontsize=8.5, color=TEXT)
-    ax.set_xticks(list(x_positions))
-    ax.set_xticklabels(labels, fontsize=9.5)
-    ax.set_ylabel("成本（元）")
-    ax.set_ylim(0, dynamic_total * 1.18)
-    ax.set_title("图 3  问题三当日总成本构成（冻结承诺 + 未来计划）", pad=12, fontsize=13)
-    ax.grid(axis="y", color=GRID, lw=0.7, alpha=0.7, zorder=0)
-    ax.text(0.5, -0.12,
-            f"ΔC = {dynamic_total:,.2f} − {static_total:,.2f} = {delta:+.2f} 元（+{float(batch['cost_change_ratio_base']) * 100:.2f}%）",
-            transform=ax.transAxes, ha="center", fontsize=9, color=RED)
-    figure.tight_layout()
-    figure.savefig(output, bbox_inches="tight")
-    plt.close(figure)
+    fig, (ax_decomp, ax_wf) = plt.subplots(1, 2, figsize=(12.5, 5.2), dpi=160)
+
+    # (a) 当日总成本分解
+    ax_decomp.bar(0, executed, width=0.5, color=ELECTRIC, label="冻结承诺成本")
+    ax_decomp.bar(0, future_fixed, bottom=executed, width=0.5, color=FUEL,
+                  label="未来固定成本")
+    ax_decomp.bar(0, future_oper, bottom=executed + future_fixed, width=0.5,
+                  color=GREEN, label="未来运行成本")
+    ax_decomp.axhline(static, color=RED, lw=1.2, ls=":")
+    ax_decomp.text(0.28, static + 150, f"问题二静态 {static:,.2f}", fontsize=8.5, color=RED)
+    ax_decomp.text(0, dynamic + 350, f"动态 {dynamic:,.2f}", ha="center",
+                   fontsize=10, fontweight="bold")
+    ax_decomp.set_xticks([0])
+    ax_decomp.set_xticklabels(["问题三当日总成本"])
+    ax_decomp.set_ylabel("成本（元）")
+    ax_decomp.set_ylim(0, dynamic * 1.16)
+    ax_decomp.set_title("(a) 当日总成本分解（冻结承诺 + 未来计划）", fontsize=11)
+    ax_decomp.legend(frameon=False, fontsize=8.5)
+    ax_decomp.grid(axis="y", color=GRID, lw=0.7, alpha=0.6, zorder=0)
+
+    # (b) ΔC 瀑布
+    step_labels = ["问题二\n静态"] + [n for n, _ in SINGLE_EVENT_DELTAS] \
+        + ["交互\n效应", "动态\n当日"]
+    deltas = [0.0] + [d for _, d in SINGLE_EVENT_DELTAS] + [SYNERGY, 0.0]
+    single = [d for _, d in SINGLE_EVENT_DELTAS]
+    colors = [GRAY] + [GREEN if d < 0 else FUEL for d in single] + ["#B9C4D4", TEAL]
+    bottoms, heights, running = [0.0], [static], static
+    for d in deltas[1:-1]:
+        bottoms.append(running)
+        heights.append(d)
+        running += d
+    bottoms.append(0.0)
+    heights.append(dynamic)
+    x = range(len(step_labels))
+    for i in range(len(step_labels)):
+        ax_wf.bar(i, heights[i], bottom=bottoms[i], width=0.55, color=colors[i], zorder=3)
+        label = f"{heights[i]:,.2f}" if i in (0, len(step_labels) - 1) else f"{heights[i]:+.2f}"
+        ax_wf.text(i, bottoms[i] + heights[i], label, ha="center", va="bottom", fontsize=8)
+    for i in range(len(step_labels) - 1):
+        ax_wf.plot([i + 0.3, i + 1 - 0.3], [bottoms[i + 1], bottoms[i + 1]],
+                   color=GRID, lw=1, zorder=2)
+    ax_wf.set_xticks(list(x))
+    ax_wf.set_xticklabels(step_labels, fontsize=8)
+    ax_wf.set_ylabel("成本（元）")
+    ax_wf.set_ylim(static - 60, dynamic + 200)
+    ax_wf.set_title("(b) ΔC 瀑布（静态 → 四事件 → 交互 → 动态）", fontsize=11)
+    ax_wf.grid(axis="y", color=GRID, lw=0.7, alpha=0.6, zorder=0)
+
+    fig.suptitle(
+        f"图 3  当日成本与增量：ΔC = {dynamic:,.2f} − {static:,.2f} = {delta:+.2f} 元（+0.11%）",
+        fontsize=13, y=1.02,
+    )
+    fig.tight_layout()
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# 图 4  事件严重度敏感性（中文标签版）
+# 图 4  响应时间与扰动
 # ---------------------------------------------------------------------------
-def plot_fig4_severity(output: Path) -> None:
+def plot_fig4_response_perturbation(totals: dict, output: Path) -> None:
+    batch = totals["batches"][0]
+    lead = float(batch["lead_time_minutes"])
+    changed = int(batch["changed_customer_count"])
+    assign = float(batch["assignment_change_ratio"]) * 100.0
+    arc = float(batch["arc_change_ratio"]) * 100.0
+    kept = int(batch["kept_trip_count"])
+    dropped = int(batch["dropped_trip_count"])
+    new = int(batch["new_trip_count"])
+
+    fig, (ax_resp, ax_pert) = plt.subplots(1, 2, figsize=(11, 4.6), dpi=160)
+
+    # (a) 响应时间
+    ax_resp.bar(["中位数"], [RESPONSE_MEDIAN_MS], width=0.4, color=ELECTRIC)
+    ax_resp.errorbar([0], [RESPONSE_MEDIAN_MS], yerr=[[RESPONSE_MEDIAN_MS],
+                     [RESPONSE_P95_MS - RESPONSE_MEDIAN_MS]], fmt="none",
+                     color=RED, capsize=6, lw=1.6)
+    ax_resp.text(0, RESPONSE_P95_MS + 0.5, f"P95 {RESPONSE_P95_MS} ms",
+                 ha="center", fontsize=9, color=RED)
+    ax_resp.set_ylim(0, RESPONSE_P95_MS * 1.5)
+    ax_resp.set_ylabel("计算响应时间（ms）")
+    ax_resp.set_title("(a) 计算响应时间（N=30）", fontsize=11)
+    ax_resp.grid(axis="y", color=GRID, lw=0.7, alpha=0.6, zorder=0)
+    ax_resp.text(0, RESPONSE_P95_MS * 0.2,
+                 f"中位 {RESPONSE_MEDIAN_MS} ms\n执行提前量 {lead:.0f} min",
+                 ha="center", fontsize=9, color=TEXT)
+
+    # (b) 扰动
+    ax_pert.barh([0, 1, 2], [assign, arc, 0], color=[GREEN, PURPLE, "none"])
+    ax_pert.set_yticks([0, 1])
+    ax_pert.set_yticklabels(["客户重分配率", "路径扰动率"], fontsize=9)
+    ax_pert.set_xlim(0, max(assign, arc) * 2.2)
+    for i, v in enumerate((assign, arc)):
+        ax_pert.text(v + 0.05, i, f"{v:.2f}%", va="center", fontsize=9)
+    ax_pert.set_xlabel("扰动率（%）")
+    ax_pert.set_title("(b) 扰动（改动客户 1 个）", fontsize=11)
+    ax_pert.grid(axis="x", color=GRID, lw=0.7, alpha=0.6, zorder=0)
+    ax_pert.text(0.02, -0.5, f"趟次：保留 {kept}、删除 {dropped}、新增 {new}",
+                 transform=ax_pert.get_xaxis_transform(), fontsize=9, color=TEXT)
+
+    fig.suptitle(
+        "图 4  实时响应能力：毫秒级计算、极小扰动（可行性 V=0）", fontsize=13, y=1.02,
+    )
+    fig.tight_layout()
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# 图 5  事件严重度敏感性
+# ---------------------------------------------------------------------------
+def plot_fig5_severity(output: Path) -> None:
     data = json.loads(SENS_JSON.read_text(encoding="utf-8"))
     results = data["results"]
-    labels = [str(row["severity"]) for row in results]
-    deltas = [float(row["delta_cost"]) for row in results]
-    arcs = [float(row["arc_change_ratio"]) for row in results]
-    assigns = [float(row["assignment_change_ratio"]) for row in results]
+    labels = [str(r["severity"]) for r in results]
+    deltas = [float(r["delta_cost"]) for r in results]
+    arcs = [float(r["arc_change_ratio"]) * 100.0 for r in results]
+    assigns = [float(r["assignment_change_ratio"]) * 100.0 for r in results]
 
-    figure, (left, right) = plt.subplots(1, 2, figsize=(10.5, 4.4), dpi=160)
-    colors = [GREEN, ELECTRIC, RED]
-    bars = left.bar(labels, deltas, color=colors, width=0.55)
-    left.axhline(0.0, color="#555555", linewidth=0.8)
-    left.set_title("成本增量随事件严重度", fontsize=12)
-    left.set_ylabel("成本增量 ΔC（元）")
-    left.set_xlabel("事件严重度")
-    for bar, value in zip(bars, deltas):
-        left.text(bar.get_x() + bar.get_width() / 2, value + 1.5, f"{value:+.2f}",
-                  ha="center", fontsize=9, color=TEXT)
-    right.plot(labels, arcs, color=RED, marker="o", linewidth=2, label="路径扰动率")
-    right.plot(labels, assigns, color=GREEN, marker="s", linewidth=2, label="客户重分配率")
-    right.set_title("扰动随事件严重度", fontsize=12)
-    right.set_ylabel("扰动率")
-    right.set_xlabel("事件严重度")
-    right.legend(frameon=False, fontsize=9)
-    right.grid(True, color=GRID, lw=0.6, alpha=0.6)
-    figure.suptitle("图 4  事件严重度敏感性（low/medium/high，订单取消为受控变量）",
-                    fontsize=13, y=0.99)
-    figure.tight_layout(rect=[0, 0, 1, 0.93])
-    figure.savefig(output, bbox_inches="tight")
-    plt.close(figure)
+    fig, (ax_cost, ax_pert) = plt.subplots(1, 2, figsize=(10.5, 4.4), dpi=160)
+    color_map = {"low": GREEN, "medium": ELECTRIC, "high": RED}
+    bars = ax_cost.bar(labels, deltas, color=[color_map.get(l, GRAY) for l in labels],
+                       width=0.55)
+    ax_cost.axhline(0.0, color="#555555", lw=0.8)
+    ax_cost.set_title("(a) 成本增量随严重度单调上升", fontsize=11)
+    ax_cost.set_ylabel("成本增量 ΔC（元）")
+    ax_cost.set_xlabel("事件严重度")
+    ax_cost.grid(axis="y", color=GRID, lw=0.7, alpha=0.6, zorder=0)
+    for bar, v in zip(bars, deltas):
+        ax_cost.text(bar.get_x() + bar.get_width() / 2, v + 1.5, f"{v:+.2f}",
+                     ha="center", fontsize=9)
 
+    ax_pert.plot(labels, arcs, color=RED, marker="o", lw=2, label="路径扰动率")
+    ax_pert.plot(labels, assigns, color=GREEN, marker="s", lw=2, label="客户重分配率")
+    ax_pert.set_title("(b) 扰动随严重度", fontsize=11)
+    ax_pert.set_ylabel("扰动率（%）")
+    ax_pert.set_xlabel("事件严重度")
+    ax_pert.legend(frameon=False, fontsize=9)
+    ax_pert.grid(True, color=GRID, lw=0.6, alpha=0.6)
+    ax_pert.set_ylim(bottom=0.0)
 
-# ---------------------------------------------------------------------------
-# 图 5  动态响应后车辆甘特图
-# ---------------------------------------------------------------------------
-def plot_fig5_gantt(future_routes, evaluator, output: Path) -> None:
-    results = []
-    for route in future_routes:
-        res = evaluator.evaluate(route, route.start_minutes)
-        results.append((route, res))
-    results.sort(key=lambda item: (item[0].vehicle_type.name, item[0].vehicle_number,
-                                   item[1].start_minutes))
-
-    vehicles = sorted(
-        {(r.vehicle_type.name, r.vehicle_number) for r, _ in results},
-        key=lambda key: (key[0], key[1]),
-    )
-    index_by_vehicle = {key: i for i, key in enumerate(vehicles)}
-
-    figure, ax = plt.subplots(figsize=(12, max(7, len(vehicles) * 0.22)), dpi=160)
-    ax.axvspan(RESTRICT_START, RESTRICT_END, color=RED, alpha=0.08, zorder=0)
-    ax.text((RESTRICT_START + RESTRICT_END) / 2, len(vehicles) + 0.6,
-            "绿色区燃油车限行 [08:00, 16:00)", ha="center", fontsize=8.5, color=RED)
-    for route, res in results:
-        key = (route.vehicle_type.name, route.vehicle_number)
-        row = index_by_vehicle[key]
-        color = ELECTRIC if route.vehicle_type.propulsion == "electric" else FUEL
-        has_c99 = any(item.customer_id == 99 for item in route.deliveries)
-        bar = ax.barh(row, res.finish_minutes - res.start_minutes,
-                      left=res.start_minutes, height=0.62, color=color, alpha=0.85,
-                      edgecolor="#7B1FA2" if has_c99 else "none",
-                      linewidth=2.0 if has_c99 else 0.0, zorder=3)
-    ax.set_yticks(range(len(vehicles)))
-    ax.set_yticklabels([f"{name}-{num:03d}" for name, num in vehicles], fontsize=7)
-    ax.set_xlim(480, 1440)
-    ax.set_xticks(range(480, 1441, 120))
-    ax.set_xticklabels([_fmt(m) for m in range(480, 1441, 120)], fontsize=8)
-    ax.set_xlabel("时刻")
-    ax.set_ylabel("物理车辆")
-    ax.set_title("图 5  动态响应后车辆配送甘特图（紫框为承接 c99 的新增趟次）",
-                 pad=12, fontsize=13)
-    ax.grid(axis="x", color=GRID, lw=0.6, alpha=0.6, zorder=1)
-    ax.invert_yaxis()
-    handles = [
-        plt.Rectangle((0, 0), 1, 1, color=ELECTRIC, label="新能源趟次"),
-        plt.Rectangle((0, 0), 1, 1, color=FUEL, label="燃油趟次"),
-        plt.Rectangle((0, 0), 1, 1, facecolor="none", edgecolor="#7B1FA2", lw=2, label="承接 c99 的趟次"),
-    ]
-    ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=9)
-    figure.tight_layout()
-    figure.savefig(output, bbox_inches="tight")
-    plt.close(figure)
+    fig.suptitle("图 5  事件严重度敏感性（low/medium/high，取消 c12 为受控变量）",
+                 fontsize=13, y=1.0)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# 图 6  单事件边际成本对比
+# 图 6  单事件边际成本与组合协同
 # ---------------------------------------------------------------------------
 def plot_fig6_event_impact(output: Path) -> None:
-    isolation = {
-        "取消 c12": -3.19,
-        "新增 c99": 40.51,
-        "变址 c82": 43.16,
-        "改窗 c70": -25.00,
-        "组合（四事件）": 47.43,
-    }
-    labels = list(isolation.keys())
-    values = list(isolation.values())
-    colors = [RED if value < 0 else ELECTRIC for value in values]
-    colors[-1] = "#7B1FA2"
-    figure, ax = plt.subplots(figsize=(8.6, 4.6), dpi=160)
+    labels = [n for n, _ in SINGLE_EVENT_DELTAS] + ["组合（四事件）"]
+    values = [d for _, d in SINGLE_EVENT_DELTAS] + [COMBINED_DELTA]
+    colors = [GREEN if v < 0 else FUEL for v in values]
+    colors[-1] = PURPLE
+    sum_single = sum(d for _, d in SINGLE_EVENT_DELTAS)
+
+    fig, ax = plt.subplots(figsize=(8.6, 4.8), dpi=160)
     bars = ax.bar(labels, values, color=colors, width=0.55)
-    ax.axhline(0.0, color="#555555", linewidth=0.9)
-    for bar, value in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width() / 2,
-                value + (1.5 if value >= 0 else -3.5),
-                f"{value:+.2f}", ha="center", fontsize=9.5,
-                color=TEXT, fontweight="bold")
+    ax.axhline(0.0, color="#555555", lw=0.9)
+    ax.axhline(sum_single, color=GRAY, lw=1.0, ls=":")
+    ax.text(3.55, sum_single + 0.6, f"单事件之和 {sum_single:+.2f}",
+            fontsize=8.5, color=TEXT, ha="right")
+    for bar, v in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width() / 2, v + (1.5 if v >= 0 else -3.5),
+                f"{v:+.2f}", ha="center", fontsize=9.5, fontweight="bold")
     ax.set_ylabel("成本增量 ΔC（元）")
-    ax.set_title("图 6  各事件边际成本与组合效应（协同 I = −8.05）", pad=12, fontsize=13)
-    ax.grid(axis="y", color=GRID, lw=0.6, alpha=0.6)
-    ax.text(0.5, -0.14,
-            "组合 ΔC(47.43) < 单事件之和(55.48)，事件间存在轻度正向协同（取消释放的新能源车承接新增订单）",
+    ax.set_title("图 6  单事件边际成本与组合效应", pad=12, fontsize=13)
+    ax.grid(axis="y", color=GRID, lw=0.6, alpha=0.6, zorder=0)
+    ax.text(0.5, -0.16,
+            f"组合 ΔC({COMBINED_DELTA:+.2f}) < 单事件之和({sum_single:+.2f})，"
+            f"交互 I = {SYNERGY:+.2f}：取消释放的新能源车承接新增订单",
             transform=ax.transAxes, ha="center", fontsize=9, color=RED)
-    figure.tight_layout()
-    figure.savefig(output, bbox_inches="tight")
-    plt.close(figure)
+    fig.tight_layout()
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
 
 
 def main() -> None:
     configure_font()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    problem = load_problem_data(DATA_DIR)
-    event_set = read_event_set()
-    problem_after, _ = apply_events(problem, event_set)
-    future_routes, evaluator = build_future_routes(problem_after)
 
-    plot_fig1_flow(OUTPUT_DIR / "question3_fig1_flow.png")
-    plot_fig2_route_map(problem_after, future_routes, evaluator,
-                        OUTPUT_DIR / "question3_fig2_route_map.png")
-    plot_fig3_cost_waterfall(OUTPUT_DIR / "question3_fig3_cost_waterfall.png")
-    plot_fig4_severity(OUTPUT_DIR / "question3_fig4_severity.png")
-    plot_fig5_gantt(future_routes, evaluator, OUTPUT_DIR / "question3_fig5_gantt.png")
+    problem = load_problem_data(DATA_DIR)
+    event_set = read_event_sets(EVENT_CSV)[0]
+    problem_after, _ = apply_events(problem, event_set)
+    static_routes = load_route_solution(STATIC_ROUTES_CSV, STATIC_SUMMARY_CSV)
+    static_eval = RouteEvaluator(problem, build_q2_policy(problem.green_customer_ids))
+    future_routes, dynamic_eval = build_future_routes(problem_after)
+    totals = json.loads(TOTALS_JSON.read_text(encoding="utf-8"))
+
+    plot_fig1_freeze(static_routes, static_eval,
+                     OUTPUT_DIR / "question3_fig1_freeze.png")
+    plot_fig2_mechanism(problem, static_routes, static_eval, future_routes,
+                        dynamic_eval, OUTPUT_DIR / "question3_fig2_mechanism.png")
+    plot_fig3_cost(totals, OUTPUT_DIR / "question3_fig3_cost_waterfall.png")
+    plot_fig4_response_perturbation(totals, OUTPUT_DIR / "question3_fig4_response_perturbation.png")
+    plot_fig5_severity(OUTPUT_DIR / "question3_fig5_severity.png")
     plot_fig6_event_impact(OUTPUT_DIR / "question3_fig6_event_impact.png")
     print(f"已生成 6 张图到 {OUTPUT_DIR.resolve()}")
 
