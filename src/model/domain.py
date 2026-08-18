@@ -66,6 +66,8 @@ class ProblemData:
     windows: dict[int, tuple[float, float]]
     coordinates: dict[int, tuple[float, float]]
     all_customer_ids: tuple[int, ...]
+    green_customer_ids: frozenset[int] = frozenset()
+    green_zone_radius_km: float = 10.0
     imputed_weight_rows: int = 0
     imputed_volume_rows: int = 0
     data_source: str = "raw"

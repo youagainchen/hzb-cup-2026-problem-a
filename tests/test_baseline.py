@@ -6,6 +6,7 @@ import numpy as np
 
 from src.model.domain import Delivery, ProblemData, Route, VehicleType
 from src.model.evaluator import RouteEvaluator, evaluate_solution
+from src.model.policy_q2 import Q2Policy
 from src.solver.fleet import select_vehicles
 from src.solver.greedy import build_greedy_routes, validate_solution
 from src.solver.local_search import (
@@ -39,6 +40,44 @@ def _problem() -> ProblemData:
 
 
 class BaselineTests(unittest.TestCase):
+    def test_q2_policy_flags_fuel_arrival_in_green_zone(self) -> None:
+        problem = ProblemData(
+            distance=np.array([[0.0, 10.0], [10.0, 0.0]]),
+            demands={1: (100.0, 1.0)},
+            windows={1: (480.0, 900.0)},
+            coordinates={0: (0.0, 0.0), 1: (1.0, 0.0)},
+            all_customer_ids=(1,),
+            green_customer_ids=frozenset({1}),
+        )
+        fuel = VehicleType("FUEL", "fuel", 1000.0, 5.0, 1)
+        route = Route(fuel, 1, [Delivery(1, 100.0, 1.0)])
+        result = evaluate_solution(
+            [route],
+            RouteEvaluator(problem, policy=Q2Policy(frozenset({1}))),
+            optimize_departures=False,
+        )
+        self.assertEqual(result.policy_violation_count, 1)
+        self.assertEqual(result.routes[0].stops[0].policy_violation_reason,
+                         "fuel_vehicle_in_green_zone_during_restricted_period")
+
+    def test_q2_policy_allows_electric_arrival_in_green_zone(self) -> None:
+        problem = _problem()
+        problem = ProblemData(
+            distance=problem.distance,
+            demands=problem.demands,
+            windows=problem.windows,
+            coordinates=problem.coordinates,
+            all_customer_ids=problem.all_customer_ids,
+            green_customer_ids=frozenset({1, 2}),
+        )
+        electric = VehicleType("EV", "electric", 3000.0, 10.0, 1)
+        route = Route(electric, 1, [Delivery(1, 100.0, 1.0)])
+        result = evaluate_solution(
+            [route],
+            RouteEvaluator(problem, policy=Q2Policy(frozenset({1, 2}))),
+            optimize_departures=False,
+        )
+        self.assertEqual(result.policy_violation_count, 0)
     def test_split_delivery_and_capacity(self) -> None:
         problem = _problem()
         fleet = (VehicleType("TEST", "electric", 3000.0, 10.0, 2),)

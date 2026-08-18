@@ -61,6 +61,16 @@ python -m src.main
 
 可用 `--initial greedy` 或 `--initial savings` 固定初始解，使用 `--no-local-search` 做初始解消融；也可用 `--data-dir data/raw` 回跑原始数据。当前仍是确定性启发式结果，不保证全局最优；下一阶段可在同一评估器上升级为 ALNS。
 
+## 问题二启动模块
+
+问题二启动阶段由 `tools/build_q2_startup.py` 一键生成绿色客户清单、Q2 实例摘要、政策敏感性表和确定性合规基线：
+
+```powershell
+python tools/build_q2_startup.py --data-dir data/processed/team_cleaned --output-dir results/question2_startup
+```
+
+政策判定集中在 `src/model/policy_q2.py`，统一评估器通过 `RouteEvaluator(problem, policy=...)` 和 `evaluate_solution(...)` 返回政策违规、漏单、容量、迟到和 24:00 返场指标。输出目录中的 `question2_baseline_totals.json` 是 1 号接入搜索器时使用的基线摘要。
+
 ## 协作约定
 
 - `main` 始终保持可运行；功能分支使用 `role1/`、`role2/`、`role3/` 前缀。

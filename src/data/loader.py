@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, time
 from pathlib import Path
+from math import hypot
 
 import numpy as np
 import pandas as pd
@@ -87,6 +88,11 @@ def load_problem_data(data_dir: str | Path) -> ProblemData:
             int(row["ID"]): (float(row["X_km"]), float(row["Y_km"]))
             for _, row in coordinate_frame.iterrows()
         }
+        green_customer_ids = frozenset(
+            int(row["ID"])
+            for _, row in coordinate_frame.iterrows()
+            if int(row.get("是否绿色配送区", 0)) == 1
+        )
         data_source = str(data_path.resolve())
         missing_value_policy = "队友清洗数据：同客户均值填补"
     else:
@@ -111,6 +117,11 @@ def load_problem_data(data_dir: str | Path) -> ProblemData:
             int(row["ID"]): (float(row["X (km)"]), float(row["Y (km)"]))
             for _, row in coordinate_frame.iterrows()
         }
+        green_customer_ids = frozenset(
+            customer_id
+            for customer_id, (x_km, y_km) in coordinates.items()
+            if customer_id != 0 and hypot(x_km, y_km) <= 10.0 + 1e-9
+        )
         data_source = str(data_path.resolve())
         missing_value_policy = "运行时同客户中位数填补"
 
@@ -145,6 +156,8 @@ def load_problem_data(data_dir: str | Path) -> ProblemData:
         windows=windows,
         coordinates=coordinates,
         all_customer_ids=all_customer_ids,
+        green_customer_ids=green_customer_ids,
+        green_zone_radius_km=10.0,
         imputed_weight_rows=missing_weight,
         imputed_volume_rows=missing_volume,
         data_source=data_source,

@@ -1,0 +1,19 @@
+﻿metric,value
+data_source,D:\数模国赛\hzb-cup-2026-problem-a\data\processed\team_cleaned
+customer_count,98
+active_customer_count,88
+total_order_count,2169
+total_weight_kg,286725.458
+total_volume_m3,778.4024400000001
+green_customer_count,15
+active_green_customer_count,12
+green_customer_ids,"[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]"
+active_green_customer_ids,"[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]"
+green_order_count,300
+green_weight_kg,36286.682
+green_volume_m3,105.01536999999999
+restricted_period,08:00-16:00
+policy_primary_interpretation,"燃油车在绿色客户节点的到达时刻采用[08:00,16:00)判定"
+green_trip_capacity_lower_bound,13
+statement_green_customer_count,30
+green_customer_count_audit,清洗坐标标记与题面30个不一致，以清洗文件标记为模型输入

@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from math import inf, isinf
 
 from src.model.domain import ProblemData, Route
+from src.model.policy_q2 import Q2Policy
 
 
 SERVICE_MINUTES = 20.0
@@ -24,6 +25,7 @@ class StopResult:
     departure_minutes: float
     waiting_minutes: float
     late_minutes: float
+    policy_violation_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class RouteEvaluation:
     late_cost: float
     total_cost: float
     stops: tuple[StopResult, ...]
+    policy_violation_count: int
 
 
 @dataclass(frozen=True)
@@ -58,6 +61,13 @@ class SolutionEvaluation:
     late_cost: float
     total_cost: float
     routes: tuple[RouteEvaluation, ...]
+    policy_violation_count: int
+    late_stop_count: int
+    unfinished_customer_count: int
+    unfinished_weight_kg: float
+    unfinished_volume_m3: float
+    capacity_violation_count: int
+    all_routes_return_before_24h: bool
 
 
 class RouteEvaluator:
@@ -65,8 +75,9 @@ class RouteEvaluator:
 
     _BOUNDARIES = (480.0, 540.0, 600.0, 690.0, 780.0, 900.0, 1020.0, 1140.0, 1440.0)
 
-    def __init__(self, problem: ProblemData):
+    def __init__(self, problem: ProblemData, policy: Q2Policy | None = None):
         self.problem = problem
+        self.policy = policy
 
     @staticmethod
     def speed_kmh(clock_minutes: float) -> float:
@@ -149,6 +160,7 @@ class RouteEvaluator:
         energy_total = 0.0
         waiting_minutes_total = 0.0
         late_minutes_total = 0.0
+        policy_violation_count = 0
         stops: list[StopResult] = []
 
         for sequence, delivery in enumerate(route.deliveries, start=1):
@@ -166,6 +178,17 @@ class RouteEvaluator:
             window_start, window_end = self.problem.windows[delivery.customer_id]
             waiting = max(0.0, window_start - arrival)
             late = max(0.0, arrival - window_end)
+            policy_violation_reason = (
+                self.policy.violation_reason(
+                    vehicle.propulsion,
+                    delivery.customer_id,
+                    arrival,
+                )
+                if self.policy is not None
+                else None
+            )
+            if policy_violation_reason is not None:
+                policy_violation_count += 1
             service_start = max(arrival, window_start)
             departure = service_start + SERVICE_MINUTES
             stops.append(
@@ -180,6 +203,7 @@ class RouteEvaluator:
                     departure_minutes=departure,
                     waiting_minutes=waiting,
                     late_minutes=late,
+                    policy_violation_reason=policy_violation_reason,
                 )
             )
             distance_total += leg_distance
@@ -227,6 +251,7 @@ class RouteEvaluator:
             late_cost=late_cost,
             total_cost=total,
             stops=tuple(stops),
+            policy_violation_count=policy_violation_count,
         )
 
     def best_departure(
@@ -290,6 +315,32 @@ def evaluate_solution(
             )
         )
     route_results = tuple(adjusted_results)
+    delivered_by_customer: dict[int, list[float]] = {
+        customer_id: [0.0, 0.0] for customer_id in evaluator.problem.demands
+    }
+    capacity_violation_count = 0
+    for route in routes:
+        if (
+            route.total_weight > route.vehicle_type.capacity_weight + 1e-6
+            or route.total_volume > route.vehicle_type.capacity_volume + 1e-6
+        ):
+            capacity_violation_count += 1
+        for item in route.deliveries:
+            if item.customer_id in delivered_by_customer:
+                delivered_by_customer[item.customer_id][0] += item.weight
+                delivered_by_customer[item.customer_id][1] += item.volume
+    unfinished_customer_count = 0
+    unfinished_weight_kg = 0.0
+    unfinished_volume_m3 = 0.0
+    for customer_id, (expected_weight, expected_volume) in evaluator.problem.demands.items():
+        actual_weight, actual_volume = delivered_by_customer[customer_id]
+        if (
+            abs(actual_weight - expected_weight) > 1e-4
+            or abs(actual_volume - expected_volume) > 1e-5
+        ):
+            unfinished_customer_count += 1
+        unfinished_weight_kg += max(0.0, expected_weight - actual_weight)
+        unfinished_volume_m3 += max(0.0, expected_volume - actual_volume)
     fuel_liters = sum(
         result.energy_amount
         for route, result in zip(routes, route_results, strict=True)
@@ -324,6 +375,21 @@ def evaluate_solution(
         late_cost=late_cost,
         total_cost=total_cost,
         routes=route_results,
+        policy_violation_count=sum(
+            result.policy_violation_count for result in route_results
+        ),
+        late_stop_count=sum(
+            sum(stop.late_minutes > 1e-9 for stop in result.stops)
+            for result in route_results
+        ),
+        unfinished_customer_count=unfinished_customer_count,
+        unfinished_weight_kg=unfinished_weight_kg,
+        unfinished_volume_m3=unfinished_volume_m3,
+        capacity_violation_count=capacity_violation_count,
+        all_routes_return_before_24h=all(
+            result.finish_minutes <= 24.0 * 60.0 + 1e-9
+            for result in route_results
+        ),
     )
 
 

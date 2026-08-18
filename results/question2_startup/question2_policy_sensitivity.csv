@@ -1,0 +1,3 @@
+﻿endpoint_interpretation,policy_violation_count_on_q1_greedy,total_cost_without_policy_repair,late_stop_count,all_routes_return_before_24h,note
+"[08:00,16:00)",14,90403.167802,15,True,端点差异仅影响恰好在08:00或16:00到达的燃油车绿色节点
+"[08:00,16:00]",14,90403.167802,15,True,端点差异仅影响恰好在08:00或16:00到达的燃油车绿色节点
