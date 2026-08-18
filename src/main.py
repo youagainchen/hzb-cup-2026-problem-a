@@ -448,49 +448,6 @@ def run(
         "question1_optimized",
     )
 
-    balanced_routes = select_and_schedule_multitrip(
-        _clone_routes(routes),
-        evaluator,
-        max_physical_vehicles=49,
-        startup_cost_weight=50.0,
-        order_rule="long_first",
-    )
-    balanced_solution = evaluate_solution(
-        balanced_routes, evaluator, optimize_departures=False
-    )
-    balanced_trace = [
-        {
-            "stage": "balanced_49",
-            "vehicles": balanced_solution.vehicle_count,
-            "trips": balanced_solution.trip_count,
-            "distance_km": balanced_solution.total_distance_km,
-            "fixed_cost": balanced_solution.fixed_cost,
-            "energy_cost": balanced_solution.energy_cost,
-            "carbon_cost": balanced_solution.carbon_cost,
-            "waiting_cost": balanced_solution.waiting_cost,
-            "late_cost": balanced_solution.late_cost,
-            "total_cost": balanced_solution.total_cost,
-        }
-    ]
-    validate_solution(problem, balanced_routes)
-    validate_vehicle_schedule(balanced_routes, evaluator)
-    _write_outputs(
-        output_dir,
-        balanced_solution,
-        balanced_routes,
-        problem,
-        balanced_trace,
-        "balanced_49",
-    )
-    plot_solution_figures(
-        balanced_routes,
-        balanced_solution,
-        problem,
-        balanced_trace,
-        output_dir,
-        "question1_balanced_49",
-    )
-
     result = {
         "vehicles": float(solution.vehicle_count),
         "trips": float(solution.trip_count),
@@ -514,10 +471,6 @@ def run(
     print(f"配送趟次容量下界：{_trip_count_capacity_lower_bound(problem)}")
     print(f"总里程：{solution.total_distance_km:.2f} km")
     print(f"碳排放：{solution.emissions_kg:.2f} kg")
-    print(
-        f"49辆稳健方案：{balanced_solution.total_cost:.2f} 元，"
-        f"等待+迟到 {balanced_solution.waiting_cost + balanced_solution.late_cost:.2f} 元"
-    )
     print(f"结果目录: {output_dir.resolve()}")
     return result
 

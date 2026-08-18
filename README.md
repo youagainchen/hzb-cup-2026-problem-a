@@ -54,10 +54,9 @@ python -m src.main
 - `results/routes/question1_optimized_routes.csv`：逐车、逐站配送路线与到达时间；
 - `results/tables/question1_optimized_route_summary.csv`：物理车辆、趟次、发车时间和分项成本；
 - `results/tables/question1_optimized_totals.json`：总成本、分项成本、总里程、碳排放、车辆数下界及建模假设。
-- `results/routes/question1_balanced_49_routes.csv` 与对应表格：49 辆低迟到稳健方案；
-- `results/figures/question1_*.svg`：成本构成、路线、装载率、车辆甘特图和优化轨迹。
+- `results/figures/question1_optimized_*.svg`：最终方案的成本构成、路线、装载率、车辆甘特图和优化轨迹。
 
-加入“所有趟次必须在当日 24:00 前返场”的硬约束后，当前清洗数据的确定性结果为：总成本最优方案 98 趟、38 辆、43,397.26 元；49 辆对照方案同为 98 趟、48,266.20 元。最优方案采用 24 个新能源趟次，并在节约值中同时考虑空间距离和时间窗中点差异。由于第一问的目标是总成本最小，应选择 38 辆方案作为最终方案，49 辆方案仅用于敏感性分析。论文还应明确说明“允许车辆返回配送中心后多趟配送”属于模型假设。
+加入“所有趟次必须在当日 24:00 前返场”的硬约束后，当前清洗数据的确定性最优结果为 98 趟、38 辆、43,397.26 元。最优方案采用 24 个新能源趟次，并在节约值中同时考虑空间距离和时间窗中点差异。论文还应明确说明“允许车辆返回配送中心后多趟配送”属于模型假设。
 
 可用 `--initial greedy` 或 `--initial savings` 固定初始解，使用 `--no-local-search` 做初始解消融；也可用 `--data-dir data/raw` 回跑原始数据。当前仍是确定性启发式结果，不保证全局最优；下一阶段可在同一评估器上升级为 ALNS。
 
