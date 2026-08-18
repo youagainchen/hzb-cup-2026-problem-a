@@ -60,15 +60,19 @@ python -m src.main
 
 可用 `--initial greedy` 或 `--initial savings` 固定初始解，使用 `--no-local-search` 做初始解消融；也可用 `--data-dir data/raw` 回跑原始数据。当前仍是确定性启发式结果，不保证全局最优；下一阶段可在同一评估器上升级为 ALNS。
 
-## 问题二启动模块
+## 问题二：实例基线与ALNS优化
 
-问题二启动阶段由 `tools/build_q2_startup.py` 一键生成绿色客户清单、Q2 实例摘要、政策敏感性表和确定性合规基线：
+2号模块由 `tools/build_q2_startup.py` 生成绿色客户清单、Q2实例摘要、政策敏感性表和确定性合规基线。政策判定集中在 `src/model/policy_q2.py`，统一评估器返回政策违规、漏单、容量、迟到和24:00返场指标。
+
+1号模块在 `src/solver/q2_search.py` 中实现车型重选、发车修复、整趟交换、整趟迁移、车辆数压缩和ALNS，通过 `src/q2_adapter.py` 只读调用2号评估器，并输出路线、收敛日志和5种子统计。
 
 ```powershell
-python tools/build_q2_startup.py --data-dir data/processed/team_cleaned --output-dir results/question2_startup
-```
+# 只重建2号实例与确定性基线
+run_question2.cmd --baseline-only
 
-政策判定集中在 `src/model/policy_q2.py`，统一评估器通过 `RouteEvaluator(problem, policy=...)` 和 `evaluate_solution(...)` 返回政策违规、漏单、容量、迟到和 24:00 返场指标。输出目录中的 `question2_baseline_totals.json` 是 1 号接入搜索器时使用的基线摘要。
+# 接入2号实例与评估器，运行1号5种子ALNS
+run_question2.cmd
+```
 
 ## 协作约定
 

@@ -5,10 +5,16 @@ set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
 
 set "TASK_PYTHON=%~dp0.venv\Scripts\python.exe"
-if exist "%TASK_PYTHON%" goto run_model
+if exist "%TASK_PYTHON%" (
+  "%TASK_PYTHON%" -c "import sys" >nul 2>nul
+  if not errorlevel 1 goto run_model
+)
 
 set "TASK_PYTHON=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
-if exist "%TASK_PYTHON%" goto run_model
+if exist "%TASK_PYTHON%" (
+  "%TASK_PYTHON%" -c "import sys" >nul 2>nul
+  if not errorlevel 1 goto run_model
+)
 
 where python >nul 2>nul
 if not errorlevel 1 (
