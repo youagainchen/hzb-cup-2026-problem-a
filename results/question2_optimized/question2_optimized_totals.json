@@ -16,38 +16,6 @@
     "EV-1250",
     "FUEL-1250"
   ],
-  "reported_scenarios": {
-    "minimum_total_cost": {
-      "total_cost": 44861.52065028771,
-      "emissions_kg": 6823.295043260212,
-      "physical_vehicles": 37,
-      "late_cost": 4916.794065980291,
-      "seed": 202601,
-      "order_rule": "green_late_hybrid",
-      "vehicle_reuse_weight": 60.0,
-      "departure_step_minutes": 2.0
-    },
-    "minimum_cost_with_non_increasing_carbon": {
-      "total_cost": 45656.99900573061,
-      "emissions_kg": 6602.905732936038,
-      "physical_vehicles": 35,
-      "late_cost": 7287.927188960321,
-      "seed": 202603,
-      "order_rule": "green_first",
-      "vehicle_reuse_weight": 99.0,
-      "departure_step_minutes": 5.0
-    },
-    "minimum_emissions_in_search": {
-      "total_cost": 48797.59651483715,
-      "emissions_kg": 6322.970879504864,
-      "physical_vehicles": 36,
-      "late_cost": 10998.924031747054,
-      "seed": 202602,
-      "order_rule": "time_window_first",
-      "vehicle_reuse_weight": 125.0,
-      "departure_step_minutes": 10.0
-    }
-  },
   "data_source": "D:\\Tencent Files\\A题\\.codex_q2_run\\data\\processed\\team_cleaned",
   "active_customers": 88,
   "green_customers": 15,

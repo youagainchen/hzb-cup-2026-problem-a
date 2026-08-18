@@ -1,0 +1,2 @@
+seed,order_rule,vehicle_reuse_weight,departure_step_minutes,total_cost,physical_vehicles,delivery_trips,emissions_kg,late_cost,policy_violation_count
+202601,green_late_hybrid,60.0,2.0,44861.52065,37,98,6823.295043,4916.794066,0

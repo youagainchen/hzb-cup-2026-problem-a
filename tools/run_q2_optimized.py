@@ -653,7 +653,7 @@ def run(data_dir: Path, output_dir: Path) -> dict[str, object]:
     _write_routes(output_dir, routes, solution, problem)
     _write_policy_audits(output_dir, routes, solution, problem, policy)
     _write_capacity_and_vehicle_audits(output_dir, routes)
-    with (output_dir / "question2_search_runs.csv").open(
+    with (output_dir / "question2_selected_search.csv").open(
         "w", newline="", encoding="utf-8-sig"
     ) as stream:
         fieldnames = [
@@ -670,120 +670,20 @@ def run(data_dir: Path, output_dir: Path) -> dict[str, object]:
         ]
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
-        for item in sorted(runs, key=lambda run: (run.evaluation.total_cost, run.seed)):
-            writer.writerow(
-                {
-                    "seed": item.seed,
-                    "order_rule": item.order_rule,
-                    "vehicle_reuse_weight": item.vehicle_reuse_weight,
-                    "departure_step_minutes": item.departure_step_minutes,
-                    "total_cost": round(item.evaluation.total_cost, 6),
-                    "physical_vehicles": item.evaluation.vehicle_count,
-                    "delivery_trips": item.evaluation.trip_count,
-                    "emissions_kg": round(item.evaluation.emissions_kg, 6),
-                    "late_cost": round(item.evaluation.late_cost, 6),
-                    "policy_violation_count": item.evaluation.policy_violation_count,
-                }
-            )
-
-    with (output_dir / "question2_resource_sensitivity.csv").open(
-        "w", newline="", encoding="utf-8-sig"
-    ) as stream:
-        fieldnames = [
-            "physical_vehicles",
-            "total_cost",
-            "late_cost",
-            "emissions_kg",
-            "seed",
-            "order_rule",
-            "vehicle_reuse_weight",
-            "departure_step_minutes",
-            "cost_gap_to_global_best",
-        ]
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
-        writer.writeheader()
-        for vehicle_count in sorted(
-            {item.evaluation.vehicle_count for item in runs}
-        ):
-            alternatives = [
-                item
-                for item in runs
-                if item.evaluation.vehicle_count == vehicle_count
-            ]
-            item = min(alternatives, key=lambda run: run.evaluation.total_cost)
-            writer.writerow(
-                {
-                    "physical_vehicles": vehicle_count,
-                    "total_cost": round(item.evaluation.total_cost, 6),
-                    "late_cost": round(item.evaluation.late_cost, 6),
-                    "emissions_kg": round(item.evaluation.emissions_kg, 6),
-                    "seed": item.seed,
-                    "order_rule": item.order_rule,
-                    "vehicle_reuse_weight": item.vehicle_reuse_weight,
-                    "departure_step_minutes": item.departure_step_minutes,
-                    "cost_gap_to_global_best": round(
-                        item.evaluation.total_cost - solution.total_cost, 6
-                    ),
-                }
-            )
-
-    pareto_runs: list[Q2ScheduleRun] = []
-    best_emissions_seen = float("inf")
-    for item in sorted(runs, key=lambda run: run.evaluation.total_cost):
-        if item.evaluation.emissions_kg < best_emissions_seen - 1e-9:
-            pareto_runs.append(item)
-            best_emissions_seen = item.evaluation.emissions_kg
-    with (output_dir / "question2_pareto_front.csv").open(
-        "w", newline="", encoding="utf-8-sig"
-    ) as stream:
-        fieldnames = [
-            "total_cost",
-            "emissions_kg",
-            "physical_vehicles",
-            "late_cost",
-            "seed",
-            "order_rule",
-            "vehicle_reuse_weight",
-            "departure_step_minutes",
-        ]
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
-        writer.writeheader()
-        for item in pareto_runs:
-            writer.writerow(
-                {
-                    "total_cost": round(item.evaluation.total_cost, 6),
-                    "emissions_kg": round(item.evaluation.emissions_kg, 6),
-                    "physical_vehicles": item.evaluation.vehicle_count,
-                    "late_cost": round(item.evaluation.late_cost, 6),
-                    "seed": item.seed,
-                    "order_rule": item.order_rule,
-                    "vehicle_reuse_weight": item.vehicle_reuse_weight,
-                    "departure_step_minutes": item.departure_step_minutes,
-                }
-            )
-
-    q1_emissions = float(q1["total_emissions_kg"])
-    non_increasing_carbon = [
-        item for item in runs if item.evaluation.emissions_kg <= q1_emissions + 1e-9
-    ]
-    balanced = (
-        min(non_increasing_carbon, key=lambda run: run.evaluation.total_cost)
-        if non_increasing_carbon
-        else min(runs, key=lambda run: run.evaluation.emissions_kg)
-    )
-    low_carbon = min(runs, key=lambda run: run.evaluation.emissions_kg)
-
-    def scenario(item: Q2ScheduleRun) -> dict[str, object]:
-        return {
-            "total_cost": item.evaluation.total_cost,
-            "emissions_kg": item.evaluation.emissions_kg,
-            "physical_vehicles": item.evaluation.vehicle_count,
-            "late_cost": item.evaluation.late_cost,
-            "seed": item.seed,
-            "order_rule": item.order_rule,
-            "vehicle_reuse_weight": item.vehicle_reuse_weight,
-            "departure_step_minutes": item.departure_step_minutes,
-        }
+        writer.writerow(
+            {
+                "seed": best.seed,
+                "order_rule": best.order_rule,
+                "vehicle_reuse_weight": best.vehicle_reuse_weight,
+                "departure_step_minutes": best.departure_step_minutes,
+                "total_cost": round(best.evaluation.total_cost, 6),
+                "physical_vehicles": best.evaluation.vehicle_count,
+                "delivery_trips": best.evaluation.trip_count,
+                "emissions_kg": round(best.evaluation.emissions_kg, 6),
+                "late_cost": round(best.evaluation.late_cost, 6),
+                "policy_violation_count": best.evaluation.policy_violation_count,
+            }
+        )
 
     totals: dict[str, object] = {
         "solution_variant": "question2_q1_policy_repair_optimized",
@@ -803,11 +703,6 @@ def run(data_dir: Path, output_dir: Path) -> dict[str, object]:
         "candidate_vehicle_types": [
             vehicle.name for vehicle in DEFAULT_VEHICLE_TYPES
         ],
-        "reported_scenarios": {
-            "minimum_total_cost": scenario(best),
-            "minimum_cost_with_non_increasing_carbon": scenario(balanced),
-            "minimum_emissions_in_search": scenario(low_carbon),
-        },
         "data_source": problem.data_source,
         "active_customers": len(problem.active_customer_ids),
         "green_customers": len(problem.green_customer_ids),
@@ -899,31 +794,6 @@ def run(data_dir: Path, output_dir: Path) -> dict[str, object]:
     markdown.extend(
         [
             "",
-            "## 成本-碳排放情景",
-            "",
-            "| 情景 | 总成本/元 | 物理车辆 | 碳排放/kg | 相对Q1成本 | 相对Q1排放 |",
-            "|---|---:|---:|---:|---:|---:|",
-        ]
-    )
-    for label, item in (
-        ("最低总成本", best),
-        ("碳排放不增加下的最低成本", balanced),
-        ("搜索范围内最低碳排放", low_carbon),
-    ):
-        cost_change = (
-            item.evaluation.total_cost / float(q1["total_cost"]) - 1.0
-        ) * 100.0
-        emission_change = (
-            item.evaluation.emissions_kg / float(q1["total_emissions_kg"]) - 1.0
-        ) * 100.0
-        markdown.append(
-            f"| {label} | {item.evaluation.total_cost:.2f} | "
-            f"{item.evaluation.vehicle_count} | {item.evaluation.emissions_kg:.2f} | "
-            f"{cost_change:+.2f}% | {emission_change:+.2f}% |"
-        )
-    markdown.extend(
-        [
-            "",
             "## 合规性",
             "",
             f"- 政策违规：{solution.policy_violation_count} 次",
@@ -934,7 +804,7 @@ def run(data_dir: Path, output_dir: Path) -> dict[str, object]:
             "- 07:59/08:00/15:59/16:00边界检查：全部通过",
             "- 原题车型容积复核：EV-3000为15 m³，FUEL-3000为13.5 m³",
             "",
-            "最低总成本方案通过减少一辆物理车并压低迟到成本控制政策代价，但其燃油占比上升，碳排放高于问题一。因此正文应同时报告碳排放不增加的平衡方案，不能把单一成本最优方案误写成同时减排。",
+            "正式答案仅保留满足全部约束后的最低总成本方案。该方案通过减少一辆物理车并压低迟到成本控制政策代价，但燃油占比上升，因此碳排放相对问题一增加；论文应如实报告这一政策影响。",
         ]
     )
     (output_dir / "question2_policy_impact.md").write_text(
